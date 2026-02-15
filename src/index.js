@@ -29,8 +29,8 @@ function connectToDatabase() {
 const start = async () => {
   try {
     connectToDatabase();
-    await fastify.listen({ port: 3000, host: '0.0.0.0' })
-    console.log('Server is running on http://localhost:3000')
+    await fastify.listen({ port: process.env.FASTIFY_PORT, host: '0.0.0.0' })
+    console.log(`Server is running on http://localhost:${process.env.FASTIFY_PORT}`)
   } catch (err) {
     fastify.log.error(err)
     process.exit(1)

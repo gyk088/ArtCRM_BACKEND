@@ -12,23 +12,22 @@ export default class UserModel extends PgObject {
       bdate: {},
       avatar: {},
       country: {},
+      password: {
+        set(password) {
+          if (password) {
+            const saltRounds = 10;
+            const hash = bcrypt.hashSync(password, saltRounds);
+            return hash;
+          }
+          return password
+        }
+      },
       city: {},
       sex: {},
       email: {},
       phone: {},
       pin: {},
       role: {},
-      login: {},
-      version: {},
-      password: {
-        set(password) {
-          if (password) {
-            const hash = bcrypt.hashSync(password);
-            return hash;
-          }
-          return password
-        }
-      },
       ctime: {
         default: new Date()
       },
