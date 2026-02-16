@@ -24,4 +24,16 @@ export default class UserService {
         const users = await UserModel.select();
         return users;
     }
+
+    static async updateUser(userData) {
+        const user = await UserModel.getUserById(userData.id); 
+        if (!user) {
+            throw new Error('User not found');
+        }
+        user.f.name = userData.name || user.f.name;
+        user.f.surname = userData.surname || user.f.surname;
+        
+        await user.save();
+        return user;
+    }
 }

@@ -7,6 +7,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
+  "type": "module",
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -16,7 +17,7 @@
     "dotenv": "^17.2.2",
     "fastify": "^5.6.0",
     "pg": "^8.16.3",
-    "pgobject": "^2.0.12"
+    "pgobject": "^1.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

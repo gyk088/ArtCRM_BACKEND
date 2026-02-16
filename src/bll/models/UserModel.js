@@ -1,4 +1,4 @@
-import PgObject from 'pgobject'
+import { PgObject } from 'pgobject'
 import bcrypt from 'bcrypt';
 
 export default class UserModel extends PgObject {
@@ -47,7 +47,8 @@ export default class UserModel extends PgObject {
   }
 
   static async getUserById(id) {
-    const users = await UserModel.select("WHERE id = $1 OR email = $2 LIMIT 1", [id]);
+    console.log('Getting user by id...', id);
+    const users = await UserModel.select("id = $1 LIMIT 1", [id]);
     return users[0];
   }
 

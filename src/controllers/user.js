@@ -28,4 +28,13 @@ export default class UserController {
         reply.code(400).send(error)
       }
     }
+
+    static async updateUser(request, reply) {
+      try {
+        const user = await UserService.updateUser(request.body);
+        return user
+      } catch (error) {
+        reply.code(400).send(error)
+      }
+    }
 }

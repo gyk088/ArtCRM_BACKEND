@@ -1,6 +1,8 @@
 require('dotenv').config({ path: `${__dirname}/../.env` });
 const { Client } = require('pg');
 
+console.log('Start migration', process.env.DB_HOST, process.env.DB_PASS);
+
 (async function run () {
     const client = new Client({
         user: process.env.DB_USER,
