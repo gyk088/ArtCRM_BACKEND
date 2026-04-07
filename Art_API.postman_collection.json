@@ -1,0 +1,710 @@
+{
+  "info": {
+    "name": "Art API Collection",
+    "description": "API для управления объектами искусства, медиа, сериями, статусами и локациями",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "art-api-collection-2024"
+  },
+  "item": [
+    {
+      "name": "Art Objects",
+      "item": [
+        {
+          "name": "Create Art Object",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"name\": \"Звездная ночь\",\n  \"technique\": \"масло\",\n  \"media\": \"{{media_id}}\",\n  \"seria\": \"{{seria_id}}\",\n  \"status\": \"{{status_id}}\",\n  \"location\": \"{{location_id}}\",\n  \"price\": 1000000.00,\n  \"year\": 1889\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects"]
+            }
+          }
+        },
+        {
+          "name": "Get All Art Objects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects"]
+            }
+          }
+        },
+        {
+          "name": "Get Art Object By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Art Object With Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}/details",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}", "details"]
+            }
+          }
+        },
+        {
+          "name": "Get Complete Art Object Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}/complete",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "Get Art Objects By User ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/user/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "user", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Art Objects With Filters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/filters?user_id={{user_id}}&year_min=1800&year_max=1900&price_min=1000&price_max=1000000",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "filters"],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{user_id}}"
+                },
+                {
+                  "key": "year_min",
+                  "value": "1800"
+                },
+                {
+                  "key": "year_max",
+                  "value": "1900"
+                },
+                {
+                  "key": "price_min",
+                  "value": "1000"
+                },
+                {
+                  "key": "price_max",
+                  "value": "1000000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Art Objects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/search?searchTerm=звездная",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "search"],
+              "query": [
+                {
+                  "key": "searchTerm",
+                  "value": "звездная"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Art Objects Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/statistics",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "statistics"]
+            }
+          }
+        },
+        {
+          "name": "Update Art Object (Full)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{art_object_id}}\",\n  \"name\": \"Звездная ночь (обновлено)\",\n  \"technique\": \"масло, холст\",\n  \"price\": 1200000.00,\n  \"year\": 1889\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects"]
+            }
+          }
+        },
+        {
+          "name": "Update Art Object (Partial)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Новое название\",\n  \"price\": 1500000.00\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Art Object",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Create Art Objects",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"artObjects\": [\n    {\n      \"user_id\": \"{{user_id}}\",\n      \"name\": \"Art Object 1\",\n      \"technique\": \"масло\",\n      \"price\": 100000.00,\n      \"year\": 2020\n    },\n    {\n      \"user_id\": \"{{user_id}}\",\n      \"name\": \"Art Object 2\",\n      \"technique\": \"акрил\",\n      \"price\": 150000.00,\n      \"year\": 2021\n    },\n    {\n      \"user_id\": \"{{user_id}}\",\n      \"name\": \"Art Object 3\",\n      \"technique\": \"акварель\",\n      \"price\": 80000.00,\n      \"year\": 2022\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/bulk",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "bulk"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Media",
+      "item": [
+        {
+          "name": "Create Media",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"name\": \"Холст\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/media",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "media"]
+            }
+          }
+        },
+        {
+          "name": "Get All Media",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/media",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "media"]
+            }
+          }
+        },
+        {
+          "name": "Get Media By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/media/{{media_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "media", "{{media_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Media By User ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/media/user/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "media", "user", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Media",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{media_id}}\",\n  \"name\": \"Холст премиум\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/media",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "media"]
+            }
+          }
+        },
+        {
+          "name": "Delete Media",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/media/{{media_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "media", "{{media_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Serias",
+      "item": [
+        {
+          "name": "Create Seria",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"name\": \"Импрессионизм\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/serias",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "serias"]
+            }
+          }
+        },
+        {
+          "name": "Get All Serias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/serias",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "serias"]
+            }
+          }
+        },
+        {
+          "name": "Get Seria By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/serias/{{seria_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "serias", "{{seria_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Seria By User ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/serias/user/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "serias", "user", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Seria",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{seria_id}}\",\n  \"name\": \"Постимпрессионизм\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/serias",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "serias"]
+            }
+          }
+        },
+        {
+          "name": "Delete Seria",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/serias/{{seria_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "serias", "{{seria_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Statuses",
+      "item": [
+        {
+          "name": "Create Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"name\": \"В продаже\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/statuses",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "statuses"]
+            }
+          }
+        },
+        {
+          "name": "Get All Statuses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/statuses",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "statuses"]
+            }
+          }
+        },
+        {
+          "name": "Get Status By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/statuses/{{status_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "statuses", "{{status_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Status By User ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/statuses/user/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "statuses", "user", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{status_id}}\",\n  \"name\": \"Продано\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/statuses",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "statuses"]
+            }
+          }
+        },
+        {
+          "name": "Delete Status",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/statuses/{{status_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "statuses", "{{status_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Locations",
+      "item": [
+        {
+          "name": "Create Location",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"name\": \"Лувр\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/locations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "locations"]
+            }
+          }
+        },
+        {
+          "name": "Get All Locations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/locations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "locations"]
+            }
+          }
+        },
+        {
+          "name": "Get Location By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/locations/{{location_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "locations", "{{location_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Location By User ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/locations/user/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "locations", "user", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Location",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{location_id}}\",\n  \"name\": \"Эрмитаж\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/locations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "locations"]
+            }
+          }
+        },
+        {
+          "name": "Delete Location",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/locations/{{location_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "locations", "{{location_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Relations (Art Object - User)",
+      "item": [
+        {
+          "name": "Add User to Art Object",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}/users/{{relation_user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}", "users", "{{relation_user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Remove User from Art Object",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}/users/{{relation_user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}", "users", "{{relation_user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Users by Art Object",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}/users",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}", "users"]
+            }
+          }
+        },
+        {
+          "name": "Get Art Objects by User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/users/{{relation_user_id}}/art-objects",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "users", "{{relation_user_id}}", "art-objects"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8888",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "string"
+    },
+    {
+      "key": "relation_user_id",
+      "value": "660e8400-e29b-41d4-a716-446655440001",
+      "type": "string"
+    },
+    {
+      "key": "art_object_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "media_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "seria_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "status_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "location_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

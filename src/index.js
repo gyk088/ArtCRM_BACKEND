@@ -1,5 +1,6 @@
 import Fastify from 'fastify'
-import userRoutes from './routes/v1/users/user.js'
+import userRoutes from './routes/v1/users/index.js'
+import artRoutes from './routes/v1/art/index.js'
 import { PgObject } from 'pgobject'
 import { Pool } from 'pg'
 import dotenv from 'dotenv';
@@ -10,6 +11,7 @@ const fastify = Fastify({
 })
 
 fastify.register(userRoutes, { prefix: 'api/v1/users' })
+fastify.register(artRoutes, { prefix: 'api/v1/art' })
 
 function connectToDatabase() {
   console.log('Connecting to database...', process.env.DB_USER);
