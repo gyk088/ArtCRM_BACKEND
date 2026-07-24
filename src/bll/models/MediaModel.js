@@ -16,12 +16,12 @@ export default class MyMedia extends PgObject {
   }
 
   static async getByUserId(userId) {
-    const mediaList = await MyMedia.select('user_id = $1', [userId]);
+    const mediaList = await MyMedia.select('WHERE user_id = $1', [userId]);
     return mediaList;
   }
 
   static async getById(id) {
-    const media = await MyMedia.select('id = $1 LIMIT 1', [id]);
+    const media = await MyMedia.select('WHERE id = $1 LIMIT 1', [id]);
     return media[0];
   } 
 }

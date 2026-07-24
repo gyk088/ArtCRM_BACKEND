@@ -1,0 +1,83 @@
+import FileService from '../bll/services/FileService.js';
+
+export default class FileController {
+    static async upload(request, reply) {
+        try {        
+            const data = await request.file();
+            const file = await FileService.upload(data, request.user);
+            return file
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
+    static async deleteFile(request, reply) {
+        try {
+            const result = await FileService.deleteFile(request.params.fileId, request.user);
+            return result;
+        } catch (error) {
+            reply.code(400).send(error);
+        }
+    }
+
+    static async getFile(request, reply) {
+        try {
+            return reply.sendFile(request.params.fileId)
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
+    static async getFile(request, reply) {
+        try {
+            return reply.sendFile(request.params.fileId)
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
+    static async getAllByUser(request, reply) {
+        try {
+            const files = await FileService.getAllByUserWithPagination(request.user, parseInt(request.query.page) || 1, parseInt(request.query.limit) || 10 );
+            return files
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
+    static async createFolder(request, reply) {
+        try {
+            const folder = await FileService.createFolder(request.body, request.user);
+            return folder;
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
+    static async getFilesInFolder(request, reply) {
+        try {
+            const files = await FileService.getFilesInFolder(request.params.folderId, request.user);
+            return files;
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
+    static async moveFileToFolder(request, reply) {
+        try {
+            const file = await FileService.moveFileToFolder(request.params.fileId, request.body.folderId, request.user);
+            return file;
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
+    static async deleteFolder(request, reply) {
+        try {
+            const result = await FileService.deleteFolder(request.params.folderId, request.user);
+            return result;
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+}

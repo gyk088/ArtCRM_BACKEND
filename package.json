@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "node --watch src/index.js",
+    "dev": "nodemon src/index.js",
+    "devnode": "node --watch src/index.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
@@ -13,11 +14,14 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/multipart": "^10.0.0",
+    "@fastify/static": "^9.1.0",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.2.2",
     "fastify": "^5.6.0",
     "pg": "^8.16.3",
-    "pgobject": "^1.0.5"
+    "pgobject": "^2.0.12"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
@@ -25,6 +29,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "globals": "^16.4.0",
+    "nodemon": "^3.1.14",
     "prettier": "^3.6.2"
   }
 }

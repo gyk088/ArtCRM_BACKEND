@@ -96,6 +96,7 @@ export default class ArtController {
     static async createMedia(request, reply) {
         try {
             const media = await ArtService.createMedia(request.body);
+            console.log(media)
             return media;
         } catch (error) {
             reply.code(400).send({ error: error.message });

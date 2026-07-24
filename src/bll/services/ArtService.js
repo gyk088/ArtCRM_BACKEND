@@ -138,7 +138,7 @@ export default class ArtService {
         }
         
         // Проверяем, есть ли объекты искусства с этим media
-        const artObjects = await MyArtObject.select('media = $1', [id]);
+        const artObjects = await MyArtObject.select('WHERE media = $1', [id]);
         if (artObjects.length > 0) {
             throw new Error(`Cannot delete media: it is used by ${artObjects.length} art object(s)`);
         }
@@ -196,7 +196,7 @@ export default class ArtService {
         }
         
         // Проверяем, есть ли объекты искусства с этой серией
-        const artObjects = await MyArtObject.select('seria = $1', [id]);
+        const artObjects = await MyArtObject.select('WHERE seria = $1', [id]);
         if (artObjects.length > 0) {
             throw new Error(`Cannot delete seria: it is used by ${artObjects.length} art object(s)`);
         }
@@ -254,7 +254,7 @@ export default class ArtService {
         }
         
         // Проверяем, есть ли объекты искусства с этим статусом
-        const artObjects = await MyArtObject.select('status = $1', [id]);
+        const artObjects = await MyArtObject.select('WHERE status = $1', [id]);
         if (artObjects.length > 0) {
             throw new Error(`Cannot delete status: it is used by ${artObjects.length} art object(s)`);
         }
@@ -312,7 +312,7 @@ export default class ArtService {
         }
         
         // Проверяем, есть ли объекты искусства с этой локацией
-        const artObjects = await MyArtObject.select('location = $1', [id]);
+        const artObjects = await MyArtObject.select('WHERE location = $1', [id]);
         if (artObjects.length > 0) {
             throw new Error(`Cannot delete location: it is used by ${artObjects.length} art object(s)`);
         }
@@ -331,7 +331,7 @@ export default class ArtService {
         }
         
         // Проверяем, не существует ли уже такая связь
-        const existingRelations = await MyArtObjectUser.select('art_id = $1 AND user_id = $2', [artId, userId]);
+        const existingRelations = await MyArtObjectUser.select('WHERE art_id = $1 AND user_id = $2', [artId, userId]);
         if (existingRelations.length > 0) {
             throw new Error('User already linked to this art object');
         }

@@ -57,13 +57,13 @@ export default class MyArtObject extends PgObject {
 
   static async getById(id) {
     console.log('Getting art object by id...', id);
-    const objects = await MyArtObject.select('id = $1 LIMIT 1', [id]);
+    const objects = await MyArtObject.select('WHERE id = $1 LIMIT 1', [id]);
     return objects[0];
   }
 
   static async getByUserId(userId) {
     console.log('Getting art objects by user id...', userId);
-    const objects = await MyArtObject.select('user_id = $1', [userId]);
+    const objects = await MyArtObject.select('WHERE user_id = $1', [userId]);
     return objects;
   }
 

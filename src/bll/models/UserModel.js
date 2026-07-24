@@ -14,7 +14,7 @@ export default class UserModel extends PgObject {
       country: {},
       password: {
         set(password) {
-          if (password) {
+          if (password) {          
             const saltRounds = 10;
             const hash = bcrypt.hashSync(password, saltRounds);
             return hash;
@@ -48,7 +48,13 @@ export default class UserModel extends PgObject {
 
   static async getUserById(id) {
     console.log('Getting user by id...', id);
-    const users = await UserModel.select("id = $1 LIMIT 1", [id]);
+    const users = await UserModel.select("WHERE id = $1 LIMIT 1", [id]);
+    return users[0];
+  }
+
+  static async getUserByEmail(email) {
+    console.log('Getting user by email...', email);
+    const users = await UserModel.select("WHERE email = $1 LIMIT 1", [email]);
     return users[0];
   }
 

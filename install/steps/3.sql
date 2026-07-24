@@ -5,12 +5,15 @@ BEGIN;
 -- Таблица файлов
 CREATE TABLE my_file (
     id              uuid DEFAULT uuid_generate_v4(),
-    name            VARCHAR(40),
+    name            TEXT,
+    filename        TEXT,  
+    comment         TEXT,
     encoding        VARCHAR(40),
     mimetype        VARCHAR(40),
     ext             VARCHAR(40),
     size            INTEGER,
     ctime           timestamp(6) with time zone DEFAULT NOW(),
+    user_id         uuid REFERENCES my_user(id),
 
     PRIMARY KEY (id)
 );

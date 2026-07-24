@@ -1,11 +1,94 @@
 {
   "info": {
     "name": "Art API Collection",
-    "description": "API для управления объектами искусства, медиа, сериями, статусами и локациями",
+    "description": "API для управления пользователями, объектами искусства, медиа, сериями, статусами, локациями и ссылками",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_postman_id": "art-api-collection-2024"
   },
   "item": [
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Иван\",\n  \"surname\": \"Петров\",\n  \"email\": \"ivan@example.com\",\n  \"phone\": \"+1234567890\",\n  \"bdate\": \"1990-01-01\",\n  \"city\": \"Москва\",\n  \"country\": \"Россия\",\n  \"sex\": \"male\",\n  \"role\": \"user\",\n  \"avatar\": \"https://example.com/avatar.jpg\",\n  \"lat\": 55.7558,\n  \"lng\": 37.6176,\n  \"client\": \"web\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/create",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "create"]
+            }
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users"]
+            }
+          }
+        },
+        {
+          "name": "Get User By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{user_id}}\",\n  \"name\": \"Иван Обновленный\",\n  \"surname\": \"Петров Обновленный\",\n  \"city\": \"Санкт-Петербург\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/update",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "update"]
+            }
+          }
+        },
+        {
+          "name": "Get User By ID (Alternative Route)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/get/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "get", "{{user_id}}"]
+            }
+          }
+        }
+      ]
+    },
     {
       "name": "Art Objects",
       "item": [
@@ -21,7 +104,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"name\": \"Звездная ночь\",\n  \"technique\": \"масло\",\n  \"media\": \"{{media_id}}\",\n  \"seria\": \"{{seria_id}}\",\n  \"status\": \"{{status_id}}\",\n  \"location\": \"{{location_id}}\",\n  \"price\": 1000000.00,\n  \"year\": 1889\n}"
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"name\": \"Звездная ночь\",\n  \"technique\": \"масло\",\n  \"description\": \"Знаменитая картина Ван Гога\",\n  \"media\": \"{{media_id}}\",\n  \"seria\": \"{{seria_id}}\",\n  \"status\": \"{{status_id}}\",\n  \"location\": \"{{location_id}}\",\n  \"price\": 1000000.00,\n  \"year\": 1889\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/art/art-objects",
@@ -75,6 +158,18 @@
               "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}/complete",
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "Get Art Object With Links",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}/complete-with-links",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}", "complete-with-links"]
             }
           }
         },
@@ -166,7 +261,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{art_object_id}}\",\n  \"name\": \"Звездная ночь (обновлено)\",\n  \"technique\": \"масло, холст\",\n  \"price\": 1200000.00,\n  \"year\": 1889\n}"
+              "raw": "{\n  \"id\": \"{{art_object_id}}\",\n  \"name\": \"Звездная ночь (обновлено)\",\n  \"technique\": \"масло, холст\",\n  \"description\": \"Обновленное описание\",\n  \"price\": 1200000.00,\n  \"year\": 1889\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/art/art-objects",
@@ -612,6 +707,367 @@
       ]
     },
     {
+      "name": "Links",
+      "item": [
+        {
+          "name": "Create Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"link\": \"https://example.com/artwork/{{art_object_id}}\",\n  \"description\": \"Ссылка на изображение высокого разрешения\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/links",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links"]
+            }
+          }
+        },
+        {
+          "name": "Create Link With Validation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"link\": \"https://valid-url.com/image.jpg\",\n  \"description\": \"Валидированная ссылка\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/validated",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "validated"]
+            }
+          }
+        },
+        {
+          "name": "Get All Links",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/links",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links"]
+            }
+          }
+        },
+        {
+          "name": "Get Link By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/{{link_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "{{link_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Complete Link Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/{{link_id}}/complete",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "{{link_id}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "Get Links By User ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/user/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "user", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get User Links With Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/users/{{user_id}}/links-stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "users", "{{user_id}}", "links-stats"]
+            }
+          }
+        },
+        {
+          "name": "Search Links",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/search?searchTerm=высокое",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "search"],
+              "query": [
+                {
+                  "key": "searchTerm",
+                  "value": "высокое"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Link By URL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/url/{{link_url_encoded}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "url", "{{link_url_encoded}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Links Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/statistics",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "statistics"]
+            }
+          }
+        },
+        {
+          "name": "Get Links Statistics By User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/statistics?userId={{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "statistics"],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{user_id}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Most Used Links",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/most-used?limit=5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "most-used"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Unused Links",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/unused",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "unused"]
+            }
+          }
+        },
+        {
+          "name": "Update Link",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{link_id}}\",\n  \"link\": \"https://example.com/updated-link\",\n  \"description\": \"Обновленное описание ссылки\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/links",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links"]
+            }
+          }
+        },
+        {
+          "name": "Delete Link",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/{{link_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "{{link_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Validate URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.com/test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "validate"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Art Object - Link Relations",
+      "item": [
+        {
+          "name": "Add Link to Art Object",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}/links/{{link_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}", "links", "{{link_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Remove Link from Art Object",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}/links/{{link_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}", "links", "{{link_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Links by Art Object",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}/links",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}", "links"]
+            }
+          }
+        },
+        {
+          "name": "Get Art Objects by Link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/links/{{link_id}}/art-objects",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "links", "{{link_id}}", "art-objects"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Add Links to Art Object",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"linkIds\": [\"{{link_id}}\", \"{{link_id_2}}\", \"{{link_id_3}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}/links/bulk",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}", "links", "bulk"]
+            }
+          }
+        },
+        {
+          "name": "Remove All Links from Art Object",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{art_object_id}}/links",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{art_object_id}}", "links"]
+            }
+          }
+        },
+        {
+          "name": "Copy Links from Art to Art",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{source_art_id}}/copy-links/{{target_art_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{source_art_id}}", "copy-links", "{{target_art_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Move Links from Art to Art",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/art/art-objects/{{source_art_id}}/move-links/{{target_art_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "art", "art-objects", "{{source_art_id}}", "move-links", "{{target_art_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Relations (Art Object - User)",
       "item": [
         {
@@ -668,17 +1124,17 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "http://localhost:8888",
+      "value": "http://31.220.77.203:9999",
       "type": "string"
     },
     {
       "key": "user_id",
-      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "value": "e56094b2-3faf-4a7b-b494-4640dabcf08a",
       "type": "string"
     },
     {
       "key": "relation_user_id",
-      "value": "660e8400-e29b-41d4-a716-446655440001",
+      "value": "e56094b2-3faf-4a7b-b494-4640dabcf08a",
       "type": "string"
     },
     {
@@ -703,6 +1159,36 @@
     },
     {
       "key": "location_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "link_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "link_id_2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "link_id_3",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "link_url_encoded",
+      "value": "https%3A%2F%2Fexample.com%2Fartwork",
+      "type": "string"
+    },
+    {
+      "key": "source_art_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "target_art_id",
       "value": "",
       "type": "string"
     }

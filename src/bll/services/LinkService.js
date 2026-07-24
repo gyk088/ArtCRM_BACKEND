@@ -1,6 +1,6 @@
 import LinkModel from '../models/LinkModel.js';
 import ArtLinkModel from '../models/ArtLinkModel.js';
-import MyArtObject from '../models/MyArtObject.js';
+import MyArtObject from '../models/ArtModel.js';
 
 export default class LinkService {
     // ============= LINK CRUD METHODS =============

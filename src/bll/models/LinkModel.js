@@ -25,19 +25,19 @@ export default class LinkModel extends PgObject {
 
   static async getById(id) {
     console.log('Getting link by id...', id);
-    const links = await LinkModel.select('id = $1 LIMIT 1', [id]);
+    const links = await LinkModel.select('WHERE id = $1 LIMIT 1', [id]);
     return links[0];
   }
 
   static async getByUserId(userId) {
     console.log('Getting links by user id...', userId);
-    const links = await LinkModel.select('user_id = $1', [userId]);
+    const links = await LinkModel.select('WHERE user_id = $1', [userId]);
     return links;
   }
 
   static async getByLinkUrl(linkUrl) {
     console.log('Getting link by URL...', linkUrl);
-    const links = await LinkModel.select('link = $1', [linkUrl]);
+    const links = await LinkModel.select('WHERE link = $1', [linkUrl]);
     return links;
   }
 

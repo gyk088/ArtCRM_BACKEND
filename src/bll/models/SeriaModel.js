@@ -16,12 +16,12 @@ export default class MySeria extends PgObject {
   }
 
   static async getByUserId(userId) {
-    const seriaList = await MySeria.select('user_id = $1', [userId]);
+    const seriaList = await MySeria.select('WHERE user_id = $1', [userId]);
     return seriaList;
   }
 
   static async getById(id) {
-    const seria = await MySeria.select('id = $1 LIMIT 1', [id]);
+    const seria = await MySeria.select('WHERE id = $1 LIMIT 1', [id]);
     return seria[0];
   } 
 }

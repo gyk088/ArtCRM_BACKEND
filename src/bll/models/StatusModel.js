@@ -16,12 +16,12 @@ export default class MyStatus extends PgObject {
   }
 
   static async getByUserId(userId) {
-    const statusList = await MyStatus.select('user_id = $1', [userId]);
+    const statusList = await MyStatus.select('WHERE user_id = $1', [userId]);
     return statusList;
   }
 
   static async getById(id) {
-    const status = await MyStatus.select('id = $1 LIMIT 1', [id]);
+    const status = await MyStatus.select('WHERE id = $1 LIMIT 1', [id]);
     return status[0];
   }
 }

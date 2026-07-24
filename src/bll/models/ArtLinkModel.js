@@ -19,23 +19,23 @@ export default class ArtLinkModel extends PgObject {
 
   static async getByArtId(artId) {
     console.log('Getting links for art object...', artId);
-    const relations = await ArtLinkModel.select('art_id = $1', [artId]);
+    const relations = await ArtLinkModel.select('WHERE art_id = $1', [artId]);
     return relations;
   }
 
   static async getByLinkId(linkId) {
     console.log('Getting art objects for link...', linkId);
-    const relations = await ArtLinkModel.select('link_id = $1', [linkId]);
+    const relations = await ArtLinkModel.select('WHERE link_id = $1', [linkId]);
     return relations;
   }
 
   static async getArtIdsByLinkId(linkId) {
-    const relations = await ArtLinkModel.select('link_id = $1', [linkId]);
+    const relations = await ArtLinkModel.select('WHERE link_id = $1', [linkId]);
     return relations.map(r => r.f.art_id);
   }
 
   static async getLinkIdsByArtId(artId) {
-    const relations = await ArtLinkModel.select('art_id = $1', [artId]);
+    const relations = await ArtLinkModel.select('WHERE art_id = $1', [artId]);
     return relations.map(r => r.f.link_id);
   }
 
@@ -74,7 +74,7 @@ export default class ArtLinkModel extends PgObject {
   }
 
   static async removeAllLinksFromArt(artId) {
-    const relations = await ArtLinkModel.select('art_id = $1', [artId]);
+    const relations = await ArtLinkModel.select('WHERE art_id = $1', [artId]);
     
     for (const relation of relations) {
       await relation.delete();
@@ -84,7 +84,7 @@ export default class ArtLinkModel extends PgObject {
   }
 
   static async removeAllArtsFromLink(linkId) {
-    const relations = await ArtLinkModel.select('link_id = $1', [linkId]);
+    const relations = await ArtLinkModel.select('WHERE link_id = $1', [linkId]);
     
     for (const relation of relations) {
       await relation.delete();
@@ -95,7 +95,7 @@ export default class ArtLinkModel extends PgObject {
 
   static async getCompleteLinksForArt(artId) {
     // Получаем все связи для арт-объекта
-    const relations = await ArtLinkModel.select('art_id = $1', [artId]);
+    const relations = await ArtLinkModel.select('WHERE art_id = $1', [artId]);
     
     if (relations.length === 0) {
       return [];
@@ -112,7 +112,7 @@ export default class ArtLinkModel extends PgObject {
 
   static async getCompleteArtsForLink(linkId) {
     // Получаем все связи для ссылки
-    const relations = await ArtLinkModel.select('link_id = $1', [linkId]);
+    const relations = await ArtLinkModel.select('WHERE link_id = $1', [linkId]);
     
     if (relations.length === 0) {
       return [];
@@ -142,12 +142,12 @@ export default class ArtLinkModel extends PgObject {
   }
 
   static async getArtObjectsCountByLink(linkId) {
-    const relations = await ArtLinkModel.select('link_id = $1', [linkId]);
+    const relations = await ArtLinkModel.select('WHERE link_id = $1', [linkId]);
     return relations.length;
   }
 
   static async getLinksCountByArt(artId) {
-    const relations = await ArtLinkModel.select('art_id = $1', [artId]);
+    const relations = await ArtLinkModel.select('WHERE art_id = $1', [artId]);
     return relations.length;
   }
 
