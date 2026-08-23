@@ -8,6 +8,7 @@ export default class MyFileFolder extends PgObject {
       },
       user_id: {},
       name: {},
+      parent_id: {},
       ctime: {
         default: new Date()
       }
@@ -21,6 +22,13 @@ export default class MyFileFolder extends PgObject {
   static async getByUserId(userId) {
     const folderList = await MyFileFolder.select('WHERE user_id = $1', [userId]);
     return folderList;
+  }
+
+  static async getByParentId(parentId, userId) {
+    if (parentId === null || parentId === undefined) {
+      return MyFileFolder.select('WHERE user_id = $1 AND parent_id IS NULL', [userId]);
+    }
+    return MyFileFolder.select('WHERE user_id = $1 AND parent_id = $2', [userId, parentId]);
   }
 
   static async getById(id) {

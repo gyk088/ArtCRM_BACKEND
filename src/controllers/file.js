@@ -11,6 +11,15 @@ export default class FileController {
         }
     }
 
+    static async updateFile(request, reply) {
+        try {
+            const file = await FileService.updateFile(request.params.fileId, request.body, request.user);
+            return file;
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
     static async deleteFile(request, reply) {
         try {
             const result = await FileService.deleteFile(request.params.fileId, request.user);
@@ -54,6 +63,24 @@ export default class FileController {
         }
     }
 
+    static async getFolders(request, reply) {
+        try {
+            const folders = await FileService.getFoldersByUser(request.user);
+            return folders;
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
+    static async updateFolder(request, reply) {
+        try {
+            const folder = await FileService.updateFolder(request.params.folderId, request.body, request.user);
+            return folder;
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
     static async getFilesInFolder(request, reply) {
         try {
             const files = await FileService.getFilesInFolder(request.params.folderId, request.user);
@@ -65,7 +92,10 @@ export default class FileController {
 
     static async moveFileToFolder(request, reply) {
         try {
-            const file = await FileService.moveFileToFolder(request.params.fileId, request.body.folderId, request.user);
+            const { folderId } = request.body;
+            const file = folderId
+                ? await FileService.moveFileToFolder(request.params.fileId, folderId, request.user)
+                : await FileService.removeFileFromFolder(request.params.fileId, request.user);
             return file;
         } catch (error) {
             reply.code(400).send(error)

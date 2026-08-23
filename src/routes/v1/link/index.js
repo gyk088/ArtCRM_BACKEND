@@ -28,6 +28,12 @@ export default async function linkRoutes(fastify, options) {
     fastify.post('/art-objects/:artId/links/bulk', {preHandler: [auth()]}, LinkController.bulkAddLinksToArtObject);
     fastify.delete('/art-objects/:artId/links', {preHandler: [auth()]}, LinkController.removeAllLinksFromArtObject);
     
+    // Link - Artist relations routes
+    fastify.post('/:linkId/artists/:artistId', {preHandler: [auth()]}, LinkController.addArtistToLink);
+    fastify.delete('/:linkId/artists/:artistId', {preHandler: [auth()]}, LinkController.removeArtistFromLink);
+    fastify.get('/:linkId/artists', {preHandler: [auth()]}, LinkController.getArtistsByLinkId);
+    fastify.get('/artists/:artistId/links', {preHandler: [auth()]}, LinkController.getLinksByArtistId);
+
     //  Advanced operations routes
     fastify.get('/art-objects/:artId/complete-with-links', {preHandler: [auth()]}, LinkController.getCompleteArtObjectWithLinks);
     fastify.post('/art-objects/:sourceArtId/copy-links/:targetArtId', {preHandler: [auth()]}, LinkController.copyLinksFromArtToArt);

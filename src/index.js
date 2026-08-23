@@ -3,7 +3,10 @@ import userRoutes from './routes/v1/users/index.js'
 import artRoutes from './routes/v1/art/index.js'
 import linkRoutes from './routes/v1/link/index.js'
 import authRoutes from './routes/v1/auth/index.js' 
-import fileRoutes from './routes/v1/file/index.js' 
+import fileRoutes from './routes/v1/file/index.js'
+import collectionRoutes from './routes/v1/collection/index.js'
+import adminRoutes from './routes/v1/admin/index.js'
+import AuditLogModel from './bll/models/AuditLogModel.js'
 
 import fastifyMultipart from '@fastify/multipart'  
 import fastifyStatic from '@fastify/static'
@@ -22,16 +25,20 @@ const fastify = Fastify({
   logger: true
 })
 
-fastify.register(fastifyMultipart)
+fastify.register(fastifyMultipart, {
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5 МБ
+  }
+})
 
 await fastify.register(cors, {
   origin: true, // Разрешить все источники (для разработки)
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 })
 
 // регистрируем static
 await fastify.register(fastifyStatic, {
-  root: path.join(__dirname, 'files'), // папка со статикой
+  root: path.join(__dirname, '..', 'files'), // папка со статикой
 })
 
 fastify.register(userRoutes, { prefix: '/api/v1/users' })
@@ -39,6 +46,26 @@ fastify.register(artRoutes, { prefix: '/api/v1/art' })
 fastify.register(linkRoutes, { prefix: '/api/v1/links' })
 fastify.register(authRoutes, { prefix: '/api/v1/auth' })
 fastify.register(fileRoutes, { prefix: '/api/v1/file' })
+fastify.register(collectionRoutes, { prefix: '/api/v1/collections' })
+fastify.register(adminRoutes, { prefix: '/api/v1/admin' })
+
+// Аудит-лог всех мутирующих запросов, сделанных во время имперсонации —
+// покрывает "все действия" из ТЗ без необходимости расставлять логирование
+// в каждом отдельном контроллере.
+fastify.addHook('onResponse', async (request, reply) => {
+  if (!request.impersonatedBy) return
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return
+
+  try {
+    await AuditLogModel.log(request.impersonatedBy, request.user?.f?.id, 'impersonated_action', {
+      method: request.method,
+      url: request.url,
+      statusCode: reply.statusCode
+    })
+  } catch (e) {
+    request.log.error(e, 'Failed to write impersonation audit log')
+  }
+})
 
 function connectToDatabase() {
   console.log('Connecting to database...', process.env.DB_USER);

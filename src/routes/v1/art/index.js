@@ -48,6 +48,14 @@ export default async function artRoutes(fastify, _options) {
     fastify.put('/locations', {preHandler: [auth()]}, ArtController.updateLocation);
     fastify.delete('/locations/:id', {preHandler: [auth()]}, ArtController.deleteLocation);
     
+    // Artist routes
+    fastify.post('/artists', {preHandler: [auth()]}, ArtController.createArtist);
+    fastify.get('/artists', {preHandler: [auth()]}, ArtController.getAllArtists);
+    fastify.get('/artists/user/:userId', {preHandler: [auth()]}, ArtController.getArtistByUserId);
+    fastify.get('/artists/:id', {preHandler: [auth()]}, ArtController.getArtistById);
+    fastify.put('/artists', {preHandler: [auth()]}, ArtController.updateArtist);
+    fastify.delete('/artists/:id', {preHandler: [auth()]}, ArtController.deleteArtist);
+
     // Relations routes
     fastify.post('/art-objects/:artId/users/:userId', {preHandler: [auth()]}, ArtController.addUserToArtObject);
     fastify.delete('/art-objects/:artId/users/:userId', {preHandler: [auth()]}, ArtController.removeUserFromArtObject);

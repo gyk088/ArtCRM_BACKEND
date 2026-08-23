@@ -15,24 +15,38 @@ export default class UserService {
         return user;
     }
 
-    static async getUserById (id) {
+    static async getUserById (id, requesterId) {
+        if (id !== requesterId) {
+            throw new Error('User not found');
+        }
         const user = await UserModel.getUserById(id);
         return user;
     }
 
-    static async getAllUsers() {
-        const users = await UserModel.select();
-        return users;
+    static async getAllUsers(requesterId) {
+        const user = await UserModel.getUserById(requesterId);
+        return user ? [user] : [];
     }
 
-    static async updateUser(userData) {
-        const user = await UserModel.getUserById(userData.id); 
+    // Поля, которые пользователь может менять сам себе через профиль.
+    // role/pin/email/password/active/client и прочие системные поля сюда
+    // намеренно не входят — их подмена через этот эндпоинт была бы повышением прав.
+    static get SELF_EDITABLE_FIELDS() {
+        return ['name', 'surname', 'bdate', 'country', 'city', 'sex', 'phone', 'certificate_header_text'];
+    }
+
+    static async updateUser(userData, requesterId) {
+        const user = await UserModel.getUserById(requesterId);
         if (!user) {
             throw new Error('User not found');
         }
-        user.f.name = userData.name || user.f.name;
-        user.f.surname = userData.surname || user.f.surname;
-        
+
+        UserService.SELF_EDITABLE_FIELDS.forEach(key => {
+            if (userData[key] !== undefined) {
+                user.f[key] = userData[key];
+            }
+        });
+
         await user.save();
         return user;
     }

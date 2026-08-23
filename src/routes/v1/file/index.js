@@ -5,9 +5,12 @@ import auth from '../../../hooks/preHendler.js';
 export default async function fileRoutes(fastify) {
   fastify.post('/upload', {preHandler: [auth()]}, FileController.upload)
   fastify.get('/:fileId', FileController.getFile)
+  fastify.put('/:fileId', {preHandler: [auth()]}, FileController.updateFile)
   fastify.get('/list', {preHandler: [auth()]}, FileController.getAllByUser)
   fastify.delete('/:fileId', {preHandler: [auth()]}, FileController.deleteFile)
   fastify.post('/folder', {preHandler: [auth()]}, FileController.createFolder)
+  fastify.get('/folder', {preHandler: [auth()]}, FileController.getFolders)
+  fastify.put('/folder/:folderId', {preHandler: [auth()]}, FileController.updateFolder)
   fastify.get('/folder/:folderId', {preHandler: [auth()]}, FileController.getFilesInFolder)
   fastify.patch('/:fileId/folder', {preHandler: [auth()]}, FileController.moveFileToFolder)
   fastify.delete('/folder/:folderId', {preHandler: [auth()]}, FileController.deleteFolder)

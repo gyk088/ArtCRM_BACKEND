@@ -38,7 +38,14 @@ export default class UserModel extends PgObject {
       active: {
         default: true
       },
-      online: {}
+      online: {},
+      reset_token: {},
+      reset_token_expires: {},
+      certificate_header_text: {},
+      // Владеющая Галерея (только для role IN ('manager','artist')) — см. CHECK
+      // my_user_gallery_scope_check. NULL означает "управляется напрямую Super Admin'ом".
+      managed_by_gallery_id: {},
+      created_by: {}
     }
   }
 
@@ -58,9 +65,14 @@ export default class UserModel extends PgObject {
     return users[0];
   }
 
+  static async getUserByResetToken(token) {
+    const users = await UserModel.select("WHERE reset_token = $1 LIMIT 1", [token]);
+    return users[0];
+  }
+
   toJSON() {
     const objToJson = {};
-    const keysToRemove = ['password'];
+    const keysToRemove = ['password', 'reset_token', 'reset_token_expires'];
     for (const key in this.f) {
       if (keysToRemove.includes(key)) continue;
       objToJson[key] = this.f[key];

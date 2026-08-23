@@ -42,7 +42,7 @@ export default class ArtLinkModel extends PgObject {
   static async addLinkToArt(artId, linkId) {
     // Проверяем, существует ли уже такая связь
     const existingRelations = await ArtLinkModel.select(
-      'art_id = $1 AND link_id = $2', 
+      'WHERE art_id = $1 AND link_id = $2',
       [artId, linkId]
     );
     
@@ -61,7 +61,7 @@ export default class ArtLinkModel extends PgObject {
 
   static async removeLinkFromArt(artId, linkId) {
     const relations = await ArtLinkModel.select(
-      'art_id = $1 AND link_id = $2', 
+      'WHERE art_id = $1 AND link_id = $2',
       [artId, linkId]
     );
     

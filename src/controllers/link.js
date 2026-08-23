@@ -2,10 +2,10 @@ import LinkService from '../bll/services/LinkService.js';
 
 export default class LinkController {
     // ============= LINK CRUD CONTROLLERS =============
-    
+
     static async createLink(request, reply) {
         try {
-            const link = await LinkService.createLink(request.body);
+            const link = await LinkService.createLink(request.body, request.user.f.id);
             return link;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -14,7 +14,7 @@ export default class LinkController {
 
     static async createLinkWithValidation(request, reply) {
         try {
-            const link = await LinkService.createLinkWithValidation(request.body);
+            const link = await LinkService.createLinkWithValidation(request.body, request.user.f.id);
             return link;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -24,7 +24,7 @@ export default class LinkController {
     static async getLinkById(request, reply) {
         try {
             const { id } = request.params;
-            const link = await LinkService.getLinkById(id);
+            const link = await LinkService.getLinkById(id, request.user.f.id);
             return link;
         } catch (error) {
             reply.code(404).send({ error: error.message });
@@ -33,7 +33,7 @@ export default class LinkController {
 
     static async getAllLinks(request, reply) {
         try {
-            const links = await LinkService.getAllLinks();
+            const links = await LinkService.getAllLinks(request.user.f.id);
             return links;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -42,8 +42,7 @@ export default class LinkController {
 
     static async getLinksByUserId(request, reply) {
         try {
-            const { userId } = request.params;
-            const links = await LinkService.getLinksByUserId(userId);
+            const links = await LinkService.getLinksByUserId(request.user.f.id);
             return links;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -52,7 +51,7 @@ export default class LinkController {
 
     static async updateLink(request, reply) {
         try {
-            const link = await LinkService.updateLink(request.body);
+            const link = await LinkService.updateLink(request.body, request.user.f.id);
             return link;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -62,7 +61,7 @@ export default class LinkController {
     static async deleteLink(request, reply) {
         try {
             const { id } = request.params;
-            const result = await LinkService.deleteLink(id);
+            const result = await LinkService.deleteLink(id, request.user.f.id);
             return result;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -70,7 +69,7 @@ export default class LinkController {
     }
 
     // ============= LINK SEARCH CONTROLLERS =============
-    
+
     static async searchLinks(request, reply) {
         try {
             const { searchTerm } = request.query;
@@ -78,7 +77,7 @@ export default class LinkController {
                 reply.code(400).send({ error: 'Search term is required' });
                 return;
             }
-            const results = await LinkService.searchLinks(searchTerm);
+            const results = await LinkService.searchLinks(searchTerm, request.user.f.id);
             return results;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -88,7 +87,7 @@ export default class LinkController {
     static async getLinkByUrl(request, reply) {
         try {
             const { url } = request.params;
-            const link = await LinkService.getLinkByUrl(url);
+            const link = await LinkService.getLinkByUrl(url, request.user.f.id);
             if (!link) {
                 reply.code(404).send({ error: 'Link not found' });
                 return;
@@ -101,8 +100,7 @@ export default class LinkController {
 
     static async getUserLinksWithStats(request, reply) {
         try {
-            const { userId } = request.params;
-            const links = await LinkService.getUserLinksWithStats(userId);
+            const links = await LinkService.getUserLinksWithStats(request.user.f.id);
             return links;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -110,11 +108,11 @@ export default class LinkController {
     }
 
     // ============= ART OBJECT LINK RELATIONS CONTROLLERS =============
-    
+
     static async addLinkToArtObject(request, reply) {
         try {
             const { artId, linkId } = request.params;
-            const relation = await LinkService.addLinkToArtObject(artId, linkId);
+            const relation = await LinkService.addLinkToArtObject(artId, linkId, request.user.f.id);
             return relation;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -124,7 +122,7 @@ export default class LinkController {
     static async removeLinkFromArtObject(request, reply) {
         try {
             const { artId, linkId } = request.params;
-            const result = await LinkService.removeLinkFromArtObject(artId, linkId);
+            const result = await LinkService.removeLinkFromArtObject(artId, linkId, request.user.f.id);
             return result;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -134,7 +132,7 @@ export default class LinkController {
     static async getLinksByArtObjectId(request, reply) {
         try {
             const { artId } = request.params;
-            const links = await LinkService.getLinksByArtObjectId(artId);
+            const links = await LinkService.getLinksByArtObjectId(artId, request.user.f.id);
             return links;
         } catch (error) {
             reply.code(404).send({ error: error.message });
@@ -144,7 +142,7 @@ export default class LinkController {
     static async getArtObjectsByLinkId(request, reply) {
         try {
             const { linkId } = request.params;
-            const artObjects = await LinkService.getArtObjectsByLinkId(linkId);
+            const artObjects = await LinkService.getArtObjectsByLinkId(linkId, request.user.f.id);
             return artObjects;
         } catch (error) {
             reply.code(404).send({ error: error.message });
@@ -155,13 +153,13 @@ export default class LinkController {
         try {
             const { artId } = request.params;
             const { linkIds } = request.body;
-            
+
             if (!linkIds || !Array.isArray(linkIds)) {
                 reply.code(400).send({ error: 'linkIds array is required' });
                 return;
             }
-            
-            const relations = await LinkService.bulkAddLinksToArtObject(artId, linkIds);
+
+            const relations = await LinkService.bulkAddLinksToArtObject(artId, linkIds, request.user.f.id);
             return { added: relations.length, relations };
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -171,19 +169,61 @@ export default class LinkController {
     static async removeAllLinksFromArtObject(request, reply) {
         try {
             const { artId } = request.params;
-            const result = await LinkService.removeAllLinksFromArtObject(artId);
+            const result = await LinkService.removeAllLinksFromArtObject(artId, request.user.f.id);
             return result;
         } catch (error) {
             reply.code(400).send({ error: error.message });
         }
     }
 
+    // ============= LINK ARTIST RELATIONS CONTROLLERS =============
+
+    static async addArtistToLink(request, reply) {
+        try {
+            const { linkId, artistId } = request.params;
+            const relation = await LinkService.addArtistToLink(linkId, artistId, request.user.f.id);
+            return relation;
+        } catch (error) {
+            reply.code(400).send({ error: error.message });
+        }
+    }
+
+    static async removeArtistFromLink(request, reply) {
+        try {
+            const { linkId, artistId } = request.params;
+            const result = await LinkService.removeArtistFromLink(linkId, artistId, request.user.f.id);
+            return result;
+        } catch (error) {
+            reply.code(400).send({ error: error.message });
+        }
+    }
+
+    static async getArtistsByLinkId(request, reply) {
+        try {
+            const { linkId } = request.params;
+            const artists = await LinkService.getArtistsByLinkId(linkId, request.user.f.id);
+            return artists;
+        } catch (error) {
+            reply.code(404).send({ error: error.message });
+        }
+    }
+
+    static async getLinksByArtistId(request, reply) {
+        try {
+            const { artistId } = request.params;
+            const links = await LinkService.getLinksByArtistId(artistId, request.user.f.id);
+            return links;
+        } catch (error) {
+            reply.code(404).send({ error: error.message });
+        }
+    }
+
     // ============= ADVANCED CONTROLLERS =============
-    
+
     static async getCompleteLinkInfo(request, reply) {
         try {
             const { id } = request.params;
-            const completeInfo = await LinkService.getCompleteLinkInfo(id);
+            const completeInfo = await LinkService.getCompleteLinkInfo(id, request.user.f.id);
             return completeInfo;
         } catch (error) {
             reply.code(404).send({ error: error.message });
@@ -193,7 +233,7 @@ export default class LinkController {
     static async getCompleteArtObjectWithLinks(request, reply) {
         try {
             const { artId } = request.params;
-            const artObject = await LinkService.getCompleteArtObjectWithLinks(artId);
+            const artObject = await LinkService.getCompleteArtObjectWithLinks(artId, request.user.f.id);
             return artObject;
         } catch (error) {
             reply.code(404).send({ error: error.message });
@@ -202,8 +242,7 @@ export default class LinkController {
 
     static async getLinksStatistics(request, reply) {
         try {
-            const { userId } = request.query;
-            const statistics = await LinkService.getLinksStatistics(userId);
+            const statistics = await LinkService.getLinksStatistics(request.user.f.id);
             return statistics;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -213,7 +252,7 @@ export default class LinkController {
     static async getMostUsedLinks(request, reply) {
         try {
             const limit = request.query.limit ? parseInt(request.query.limit) : 10;
-            const links = await LinkService.getMostUsedLinks(limit);
+            const links = await LinkService.getMostUsedLinks(limit, request.user.f.id);
             return links;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -222,7 +261,7 @@ export default class LinkController {
 
     static async getUnusedLinks(request, reply) {
         try {
-            const links = await LinkService.getUnusedLinks();
+            const links = await LinkService.getUnusedLinks(request.user.f.id);
             return links;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -232,7 +271,7 @@ export default class LinkController {
     static async copyLinksFromArtToArt(request, reply) {
         try {
             const { sourceArtId, targetArtId } = request.params;
-            const result = await LinkService.copyLinksFromArtToArt(sourceArtId, targetArtId);
+            const result = await LinkService.copyLinksFromArtToArt(sourceArtId, targetArtId, request.user.f.id);
             return result;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -242,7 +281,7 @@ export default class LinkController {
     static async moveLinksFromArtToArt(request, reply) {
         try {
             const { sourceArtId, targetArtId } = request.params;
-            const result = await LinkService.moveLinksFromArtToArt(sourceArtId, targetArtId);
+            const result = await LinkService.moveLinksFromArtToArt(sourceArtId, targetArtId, request.user.f.id);
             return result;
         } catch (error) {
             reply.code(400).send({ error: error.message });

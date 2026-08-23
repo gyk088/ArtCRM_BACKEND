@@ -30,13 +30,40 @@ export default class FileService {
       filename: data.filename || 'none',
       encoding: data.encoding,
       mimetype: data.mimetype || 'none',
-      size: fileStream.bytesRead,
+      size: 0,
       ext: fileExt(data.filename || ''),
       user_id: user.f.id
     });
     await fileObj.save();
-    await pump(data.file, fs.createWriteStream('./files/' + fileObj.f.id + '.' + fileObj.f.ext))
+
+    const filePath = './files/' + fileObj.f.id + '.' + fileObj.f.ext
+
+    try {
+      await pump(data.file, fs.createWriteStream(filePath))
+    } catch (err) {
+      fs.unlink(filePath, () => {})
+      await fileObj.delete()
+
+      if (fileStream.truncated || err.code === 'FST_REQ_FILE_TOO_LARGE') {
+        throw new Error(`Файл превышает максимальный размер ${FileService.MAX_FILE_SIZE_MB} МБ`)
+      }
+      throw err
+    }
+
+    if (fileStream.truncated) {
+      fs.unlink(filePath, () => {})
+      await fileObj.delete()
+      throw new Error(`Файл превышает максимальный размер ${FileService.MAX_FILE_SIZE_MB} МБ`)
+    }
+
+    fileObj.f.size = fileStream.bytesRead
+    await fileObj.save()
+
     return fileObj;
+  }
+
+  static get MAX_FILE_SIZE_MB() {
+    return 5
   }
 
 
@@ -103,6 +130,25 @@ export default class FileService {
   }
 
   /**
+   * Переименовать файл / изменить комментарий
+   *
+   * @param {string} id - ID файла
+   * @param {object} fileData - {name, comment}
+   * @param {object} user - объект пользователя
+   * @return {object} result - обновлённый файл
+   * @static
+  */
+  static async updateFile(id, fileData, user) {
+    const file = await this.getFileById(id, user);
+
+    file.f.name = fileData.name !== undefined ? fileData.name : file.f.name;
+    file.f.comment = fileData.comment !== undefined ? fileData.comment : file.f.comment;
+
+    await file.save();
+    return file;
+  }
+
+  /**
    * Получить файл с физическим доступом
    *
    * @param {string} id - ID файла
@@ -146,9 +192,14 @@ export default class FileService {
   // ============= FILE FOLDER METHODS =============
 
   static async createFolder(folderData, user) {
+    if (folderData.parent_id) {
+      await this.getFolderById(folderData.parent_id, user);
+    }
+
     const folder = new FileFolderModel({
       name: folderData.name,
-      user_id: user.f.id
+      user_id: user.f.id,
+      parent_id: folderData.parent_id || null
     });
 
     await folder.save();
@@ -168,22 +219,60 @@ export default class FileService {
     return folders;
   }
 
+  static async __getDescendantFolderIds(id, userId) {
+    const children = await FileFolderModel.getByParentId(id, userId);
+    let ids = [];
+    for (const child of children) {
+      ids.push(child.f.id);
+      ids = ids.concat(await this.__getDescendantFolderIds(child.f.id, userId));
+    }
+    return ids;
+  }
+
   static async updateFolder(id, folderData, user) {
     const folder = await this.getFolderById(id, user);
 
     folder.f.name = folderData.name !== undefined ? folderData.name : folder.f.name;
 
+    if (folderData.parent_id !== undefined) {
+      const newParentId = folderData.parent_id;
+
+      if (newParentId === id) {
+        throw new Error('Cannot move folder into itself');
+      }
+
+      if (newParentId) {
+        await this.getFolderById(newParentId, user);
+
+        const descendantIds = await this.__getDescendantFolderIds(id, user.f.id);
+        if (descendantIds.includes(newParentId)) {
+          throw new Error('Cannot move folder into its own subfolder');
+        }
+      }
+
+      folder.f.parent_id = newParentId;
+    }
+
     await folder.save();
     return folder;
   }
 
-  static async deleteFolder(id, user) {
-    const folder = await this.getFolderById(id, user);
+  static async __cascadeDeleteFolder(id, user) {
+    const children = await FileFolderModel.getByParentId(id, user.f.id);
+    for (const child of children) {
+      await this.__cascadeDeleteFolder(child.f.id, user);
+    }
 
-    // Отвязываем файлы от папки перед удалением
     await FileModel.clearFolderId(id);
 
+    const folder = await FileFolderModel.getByIdForUser(id, user.f.id);
     await folder.delete();
+  }
+
+  static async deleteFolder(id, user) {
+    await this.getFolderById(id, user);
+
+    await this.__cascadeDeleteFolder(id, user);
     return { success: true, message: 'Folder deleted successfully', id };
   }
 
