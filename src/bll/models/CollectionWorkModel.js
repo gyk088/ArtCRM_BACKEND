@@ -75,6 +75,7 @@ export default class CollectionWorkModel extends PgObject {
         m.name as media_name,
         s.name as seria_name,
         st.name as status_name,
+        st.color as status_color,
         l.name as location_name,
         ar.name as artist_name
       FROM my_collection_work cw

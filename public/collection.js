@@ -10,10 +10,32 @@
     return !visibleFields || visibleFields[key] !== false;
   }
 
-  function formatPrice(price) {
+  var CURRENCY_SYMBOLS = { RUB: '₽', BYN: 'Br', USD: '$', EUR: '€' };
+
+  function roundToStep(value, step) {
+    var s = Number(step) > 0 ? Number(step) : 1;
+    return Math.round(value / s) * s;
+  }
+
+  // Зеркалит логику src/controllers/publicPage.js: если у ссылки задана
+  // display_currency — цена пересчитывается по курсу/округлению ссылки и
+  // показывается в этой валюте, иначе — как есть, в валюте самой работы.
+  function formatPrice(price, workCurrency) {
     var num = Number(price);
     if (Number.isNaN(num)) return price;
-    return new Intl.NumberFormat('ru-RU').format(num) + ' ₽';
+
+    var value = num;
+    var currency = workCurrency || 'RUB';
+
+    if (data.displayCurrency) {
+      var rate = Number(data.currencyRate) > 0 ? Number(data.currencyRate) : 1;
+      var rounding = Number(data.currencyRounding) > 0 ? Number(data.currencyRounding) : 1;
+      value = roundToStep(num * rate, rounding);
+      currency = data.displayCurrency;
+    }
+
+    var symbol = CURRENCY_SYMBOLS[currency] || CURRENCY_SYMBOLS.RUB;
+    return new Intl.NumberFormat('ru-RU').format(value) + ' ' + symbol;
   }
 
   function escapeHtml(str) {
@@ -225,7 +247,7 @@
       html += '<p class="work-description">' + escapeHtml(work.description) + '</p>';
     }
     if (work.price && isFieldVisible('price')) {
-      html += '<div class="work-price">' + escapeHtml(formatPrice(work.price)) + '</div>';
+      html += '<div class="work-price">' + escapeHtml(formatPrice(work.price, work.currency)) + '</div>';
     }
     html += '<div class="details-divider"></div>';
 

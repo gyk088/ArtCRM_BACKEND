@@ -194,26 +194,31 @@ html[data-theme="light"] .theme-icon-sun {
   color: var(--text-faint);
 }
 
-/* ==== Hero ==== */
+/* ==== Hero ====
+   Раньше .hero был фиксированной высоты (48vh/38vh), а длинное описание
+   ссылки просто обрезалось и скроллилось внутри .hero-description — hero
+   должен вмещать весь текст целиком, поэтому теперь это только МИНИМАЛЬНАЯ
+   высота, а сама секция растёт под контент. Фон/оверлей раньше были
+   position:fixed с той же фиксированной высотой (эффект «фон стоит на
+   месте, пока контент проезжает поверх») — при динамической высоте это
+   рассинхронизировалось бы (высокий hero, а фон покрывает только 48vh),
+   поэтому переведены на position:absolute внутри .hero, чтобы всегда
+   точно совпадать с его реальной высотой. */
 .hero {
   position: relative;
-  height: 48vh;
+  min-height: 48vh;
   display: flex;
   align-items: flex-end;
   background: var(--bg-soft);
-  overflow: hidden;
 }
 
 .hero.no-image {
-  height: 38vh;
+  min-height: 38vh;
 }
 
 .hero-bg {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 48vh;
+  position: absolute;
+  inset: 0;
   z-index: 0;
   background-size: cover;
   background-position: center 20%;
@@ -225,11 +230,8 @@ html[data-theme="light"] .hero-bg {
 }
 
 .hero-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 48vh;
+  position: absolute;
+  inset: 0;
   z-index: 0;
   background: linear-gradient(
     180deg,
@@ -251,7 +253,6 @@ html[data-theme="light"] .hero-bg {
   margin: 0 auto;
   padding: 96px 32px 48px;
   width: 100%;
-  max-height: 100%;
   box-sizing: border-box;
   text-align: center;
   display: flex;
@@ -318,11 +319,7 @@ html[data-theme="light"] .hero-bg {
 }
 
 .hero-description {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  flex: 0 0 auto;
   font-size: 18px;
   font-style: italic;
   font-weight: 300;
@@ -331,10 +328,6 @@ html[data-theme="light"] .hero-bg {
   max-width: 1100px;
   margin: 0 auto 22px;
   animation-delay: 0.3s;
-}
-
-.hero-description::-webkit-scrollbar {
-  display: none;
 }
 
 .hero-description strong,
@@ -659,6 +652,25 @@ html[data-theme="light"] .hero-bg {
   color: var(--accent);
 }
 
+/* Инлайновые SVG без width/height (только viewBox) внутри span с auto-шириной
+   не имеют определённого intrinsic-размера — в паре с display:none/none у
+   ОБОИХ span'ов до первого срабатывания это давало 0 видимых иконок вообще.
+   Фиксируем размер явно (как у .theme-icon) и держим icon-main/icon-alt
+   строго взаимоисключающими через display:flex/none. */
+.viewer-toolbar-btn .icon-main,
+.viewer-toolbar-btn .icon-alt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewer-toolbar-btn .icon-main svg,
+.viewer-toolbar-btn .icon-alt svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
 .viewer-toolbar-btn .icon-alt {
   display: none;
 }
@@ -668,7 +680,7 @@ html[data-theme="light"] .hero-bg {
 }
 
 .viewer-toolbar-btn.toggled .icon-alt {
-  display: block;
+  display: flex;
 }
 
 .work-modal-content {

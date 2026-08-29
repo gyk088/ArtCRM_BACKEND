@@ -89,7 +89,7 @@
                 <% if (work.technique && isFieldVisible('technique')) { %><p class="art-detail"><%= work.technique %></p><% } %>
                 <% if (work.size && isFieldVisible('size')) { %><p class="art-detail"><%= work.size %></p><% } %>
                 <% if (work.status_name && isFieldVisible('status')) { %><p class="art-detail"><%= work.status_name %></p><% } %>
-                <% if (work.price && isFieldVisible('price')) { %><p class="art-price"><%= formatPrice(work.price) %></p><% } %>
+                <% if (work.price && isFieldVisible('price')) { %><p class="art-price"><%= formatPrice(work.price, work.currency) %></p><% } %>
               </div>
             </button>
             <% }) %>
@@ -142,7 +142,13 @@
     </div>
   </div>
 
-  <script id="collection-data" type="application/json"><%- JSON.stringify({ works: works, visibleFields: collection.visibleFields || {} }) %></script>
+  <script id="collection-data" type="application/json"><%- JSON.stringify({
+    works: works,
+    visibleFields: collection.visibleFields || {},
+    displayCurrency: collection.displayCurrency || null,
+    currencyRate: collection.currencyRate || 1,
+    currencyRounding: collection.currencyRounding || 1
+  }) %></script>
   <script src="/static/collection.js" defer></script>
 </body>
 </html>

@@ -19,10 +19,34 @@ function isFieldVisible(visibleFields, key) {
     return !visibleFields || visibleFields[key] !== false;
 }
 
-function formatPrice(price) {
+const CURRENCY_SYMBOLS = { RUB: '₽', BYN: 'Br', USD: '$', EUR: '€' };
+
+// Округление до шага (напр. 10 -> ...120, 130...; 1 -> целые числа).
+function roundToStep(value, step) {
+    const s = Number(step) > 0 ? Number(step) : 1;
+    return Math.round(value / s) * s;
+}
+
+// Если у ссылки задана переопределённая валюта показа (display_currency) —
+// цена работы (в её родной валюте) пересчитывается по заданному курсу и
+// округлению и показывается в этой валюте; иначе показывается как есть,
+// в собственной валюте работы.
+function formatPrice(price, workCurrency, collection) {
     const num = Number(price);
     if (Number.isNaN(num)) return price;
-    return new Intl.NumberFormat('ru-RU').format(num) + ' ₽';
+
+    let value = num;
+    let currency = workCurrency || 'RUB';
+
+    if (collection?.displayCurrency) {
+        const rate = Number(collection.currencyRate) > 0 ? Number(collection.currencyRate) : 1;
+        const rounding = Number(collection.currencyRounding) > 0 ? Number(collection.currencyRounding) : 1;
+        value = roundToStep(num * rate, rounding);
+        currency = collection.displayCurrency;
+    }
+
+    const symbol = CURRENCY_SYMBOLS[currency] || CURRENCY_SYMBOLS.RUB;
+    return new Intl.NumberFormat('ru-RU').format(value) + ' ' + symbol;
 }
 
 export default class PublicPageController {
@@ -44,7 +68,11 @@ export default class PublicPageController {
             const heroImage = (withAvatar && withAvatar.avatar.url) || '';
             const coverImage = (collection.avatar && collection.avatar.url) || heroImage || '';
             const description = stripHtml(collection.description);
-            const ogDescription = (description || `${works.length} работ`).slice(0, 160);
+            // Количество работ должно быть видно в превью ссылки (например, при
+            // пересылке в Telegram) всегда, а не только когда у ссылки нет
+            // собственного описания — иначе оно пряталось за текстом описания.
+            const workCountText = `${works.length} ${workWord(works.length)}`;
+            const ogDescription = (description ? `${workCountText} · ${description}` : workCountText).slice(0, 160);
             const pageUrl = `${request.protocol}://${request.headers.host}${request.url}`;
 
             return reply.view('collection.ejs', {
@@ -57,7 +85,7 @@ export default class PublicPageController {
                 pageUrl,
                 icons,
                 isFieldVisible: (key) => isFieldVisible(collection.visibleFields, key),
-                formatPrice,
+                formatPrice: (price, workCurrency) => formatPrice(price, workCurrency, collection),
             });
         } catch (error) {
             request.log.error(error);

@@ -10,6 +10,7 @@ export default class CollectionService {
         const {
             artist_or_gallery,
             show_technique, show_year, show_seria, show_media, show_location, show_price,
+            display_currency, currency_rate, currency_rounding,
             ...rest
         } = collection;
 
@@ -23,7 +24,10 @@ export default class CollectionService {
                 media: show_media,
                 location: show_location,
                 price: show_price
-            }
+            },
+            displayCurrency: display_currency,
+            currencyRate: currency_rate,
+            currencyRounding: currency_rounding,
         };
     }
 
@@ -56,6 +60,9 @@ export default class CollectionService {
             show_location: data.visibleFields?.location !== false,
             show_price: data.visibleFields?.price !== false,
             imported: !!data.imported,
+            display_currency: data.displayCurrency ?? null,
+            currency_rate: data.currencyRate ?? 1,
+            currency_rounding: data.currencyRounding ?? 1,
         });
         await collection.save();
 
@@ -99,6 +106,9 @@ export default class CollectionService {
         if (data.artistOrGallery !== undefined) collection.f.artist_or_gallery = data.artistOrGallery;
         if (data.description !== undefined) collection.f.description = data.description;
         if (data.avatar !== undefined) collection.f.avatar_id = data.avatar?.id || null;
+        if (data.displayCurrency !== undefined) collection.f.display_currency = data.displayCurrency;
+        if (data.currencyRate !== undefined) collection.f.currency_rate = data.currencyRate;
+        if (data.currencyRounding !== undefined) collection.f.currency_rounding = data.currencyRounding;
 
         if (data.visibleFields) {
             const vf = data.visibleFields;
