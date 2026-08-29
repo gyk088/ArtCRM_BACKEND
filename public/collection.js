@@ -6,6 +6,11 @@
   var works = data.works || [];
   var visibleFields = data.visibleFields || {};
 
+  // Порядок отображения/пролистывания работ — индексы в works. Меняется
+  // сортировкой (см. applySort), а не сам массив works, чтобы не ломать
+  // связку data-work-index в разметке карточек с их реальными данными.
+  var displayOrder = works.map(function (_, i) { return i; });
+
   function isFieldVisible(key) {
     return !visibleFields || visibleFields[key] !== false;
   }
@@ -161,12 +166,18 @@
   }
 
   // --- соседние работы ---
-  function prevWork() { return activeIndex > 0 ? works[activeIndex - 1] : null; }
-  function nextWork() { return activeIndex >= 0 && activeIndex < works.length - 1 ? works[activeIndex + 1] : null; }
+  // activeIndex — позиция в displayOrder (текущем порядке показа), а не
+  // индекс в works напрямую, иначе пролистывание в открытом просмотрщике
+  // после сортировки прыгало бы по исходному, а не по видимому порядку.
+  function workAt(position) {
+    return works[displayOrder[position]] || null;
+  }
+  function prevWork() { return activeIndex > 0 ? workAt(activeIndex - 1) : null; }
+  function nextWork() { return activeIndex >= 0 && activeIndex < displayOrder.length - 1 ? workAt(activeIndex + 1) : null; }
   function workImage(work) { return (work && work.avatar && work.avatar.url) || ''; }
 
   function thumbnails() {
-    var work = works[activeIndex];
+    var work = workAt(activeIndex);
     if (!work) return [];
     var list = [];
     if (work.avatar && work.avatar.url) list.push(work.avatar);
@@ -185,7 +196,7 @@
       btn.type = 'button';
       var img = document.createElement('img');
       img.src = thumb.url;
-      img.alt = (works[activeIndex].name || '') + ' ' + (idx + 1);
+      img.alt = (workAt(activeIndex).name || '') + ' ' + (idx + 1);
       btn.appendChild(img);
       btn.addEventListener('click', function () {
         activeImageIndex = idx;
@@ -211,7 +222,7 @@
   }
 
   function renderDetails() {
-    var work = works[activeIndex];
+    var work = workAt(activeIndex);
     if (!work) return;
 
     var html = '';
@@ -291,8 +302,11 @@
     applyTransforms();
   }
 
-  function openViewer(index) {
-    activeIndex = index;
+  function openViewer(workIndex) {
+    // workIndex — исходный индекс в works (из data-work-index карточки),
+    // а activeIndex внутри просмотрщика — позиция этой же работы в текущем
+    // (возможно отсортированном) displayOrder.
+    activeIndex = displayOrder.indexOf(workIndex);
     activeImageIndex = 0;
     infoHidden = false;
     workModalContent.classList.remove('info-hidden');
@@ -330,6 +344,82 @@
   document.querySelectorAll('.art-card').forEach(function (card) {
     card.addEventListener('click', function () {
       openViewer(Number(card.dataset.workIndex));
+    });
+  });
+
+  // ================= Сортировка (название / художник / цена) =================
+  // Клик по чипу: неактивный -> активный по возрастанию; активный по
+  // возрастанию -> по убыванию; активный по убыванию -> снова "по умолчанию"
+  // (сброс). Так не нужна отдельная кнопка сброса — она встроена в сам чип.
+  var galleryGrid = document.querySelector('.gallery-grid');
+  var sortChips = Array.prototype.slice.call(document.querySelectorAll('.sort-chip'));
+  var sortState = { field: null, dir: 'asc' };
+
+  function priceOf(work) {
+    var num = Number(work.price);
+    return work.price != null && !Number.isNaN(num) ? num : null;
+  }
+
+  function sortValue(work, field) {
+    if (field === 'price') return priceOf(work);
+    if (field === 'artist') return (work.artist_name || '').trim().toLowerCase() || null;
+    if (field === 'name') return (work.name || '').trim().toLowerCase() || null;
+    return null;
+  }
+
+  function updateSortChipsUI() {
+    sortChips.forEach(function (chip) {
+      var active = chip.dataset.sortField === sortState.field;
+      chip.classList.toggle('active', active);
+      chip.querySelector('.sort-chip-arrow').textContent = active ? (sortState.dir === 'asc' ? ' ↑' : ' ↓') : '';
+    });
+  }
+
+  function applySort() {
+    var indices = works.map(function (_, i) { return i; });
+    var field = sortState.field;
+    var dir = sortState.dir;
+
+    if (field) {
+      indices.sort(function (a, b) {
+        var va = sortValue(works[a], field);
+        var vb = sortValue(works[b], field);
+        // Работы без значения по выбранному полю — всегда в конце.
+        if (va === null && vb === null) return 0;
+        if (va === null) return 1;
+        if (vb === null) return -1;
+        if (typeof va === 'string') {
+          var cmp = va.localeCompare(vb, 'ru');
+          return dir === 'asc' ? cmp : -cmp;
+        }
+        return dir === 'asc' ? va - vb : vb - va;
+      });
+    }
+
+    displayOrder = indices;
+
+    if (galleryGrid) {
+      indices.forEach(function (workIndex) {
+        var card = galleryGrid.querySelector('.art-card[data-work-index="' + workIndex + '"]');
+        if (card) galleryGrid.appendChild(card);
+      });
+    }
+  }
+
+  sortChips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var field = chip.dataset.sortField;
+      if (sortState.field !== field) {
+        sortState.field = field;
+        sortState.dir = 'asc';
+      } else if (sortState.dir === 'asc') {
+        sortState.dir = 'desc';
+      } else {
+        sortState.field = null;
+        sortState.dir = 'asc';
+      }
+      updateSortChipsUI();
+      applySort();
     });
   });
 
@@ -520,7 +610,7 @@
   function onSpringSettled() {
     if (swipe.pendingDirection !== 0) {
       var newIndex = activeIndex - swipe.pendingDirection;
-      if (works[newIndex]) {
+      if (workAt(newIndex)) {
         activeIndex = newIndex;
         activeImageIndex = 0;
         resetZoom();

@@ -1,6 +1,5 @@
 import { PgObject } from 'pgobject';
-
-const FILE_BASE_URL = 'https://dev.myoffer.life/files';
+import { getFileBaseUrl } from '../utils/const.js';
 
 export default class ArtImageModel extends PgObject {
   static get schema() {
@@ -73,7 +72,7 @@ export default class ArtImageModel extends PgObject {
       ext: row.ext,
       name: row.name,
       comment: row.comment,
-      url: `${FILE_BASE_URL}/${row.id}.${row.ext}`
+      url: `${getFileBaseUrl()}/${row.id}.${row.ext}`
     }));
   }
 

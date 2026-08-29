@@ -71,6 +71,18 @@
           <% if (!works.length) { %>
           <div class="empty-state">В этой ссылке пока нет работ</div>
           <% } else { %>
+          <% if (works.length > 1) { %>
+          <div class="gallery-toolbar">
+            <span class="sort-toolbar-label">Сортировка</span>
+            <div class="sort-chip-group" id="sortChipGroup">
+              <button type="button" class="sort-chip" data-sort-field="name">Название<span class="sort-chip-arrow"></span></button>
+              <button type="button" class="sort-chip" data-sort-field="artist">Художник<span class="sort-chip-arrow"></span></button>
+              <% if (isFieldVisible('price')) { %>
+              <button type="button" class="sort-chip" data-sort-field="price">Цена<span class="sort-chip-arrow"></span></button>
+              <% } %>
+            </div>
+          </div>
+          <% } %>
           <div class="gallery-grid">
             <% works.forEach(function (work, index) { %>
             <button type="button" class="art-card reveal-on-scroll" data-work-index="<%= index %>">

@@ -1,6 +1,5 @@
 import { PgObject } from 'pgobject';
-
-const FILE_BASE_URL = 'https://dev.myoffer.life/files';
+import { getFileBaseUrl } from '../utils/const.js';
 
 export default class MyArtObject extends PgObject {
   static get schema() {
@@ -128,7 +127,7 @@ export default class MyArtObject extends PgObject {
     const { f_id, f_ext, f_name, ...rest } = row;
     return {
       ...rest,
-      avatar: f_id ? { id: f_id, ext: f_ext, name: f_name, url: `${FILE_BASE_URL}/${f_id}.${f_ext}` } : null
+      avatar: f_id ? { id: f_id, ext: f_ext, name: f_name, url: `${getFileBaseUrl()}/${f_id}.${f_ext}` } : null
     };
   }
 

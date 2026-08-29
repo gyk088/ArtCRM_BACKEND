@@ -250,6 +250,13 @@ export default class FileService {
         }
       }
 
+      // order_num был позицией среди старых соседей — на новом уровне он
+      // бессмысленен и может случайно совпасть с чужим. Сбрасываем, чтобы
+      // перемещённая папка встала в конец нового уровня (как обычная новая).
+      if ((folder.f.parent_id || null) !== (newParentId || null)) {
+        folder.f.order_num = null;
+      }
+
       folder.f.parent_id = newParentId;
     }
 
@@ -299,5 +306,56 @@ export default class FileService {
     file.f.folder_id = null;
     await file.save();
     return file;
+  }
+
+  /**
+   * Пересортировка файлов внутри одной папки (или корня) — фронтенд
+   * присылает id файлов в новом визуальном порядке (после drag&drop),
+   * мы просто нумеруем их по порядку в этом массиве.
+   *
+   * @param {string[]} ids - id файлов в новом порядке
+   * @param {object} user
+   * @return {object[]} обновлённые файлы
+   * @static
+  */
+  static async reorderFiles(ids, user) {
+    const files = await FileModel.getByIdsForUser(ids, user.f.id);
+    if (files.length !== ids.length) {
+      throw new Error('Some files not found or access denied');
+    }
+
+    const byId = new Map(files.map(f => [f.f.id, f]));
+    for (let i = 0; i < ids.length; i++) {
+      const file = byId.get(ids[i]);
+      file.f.order_num = i;
+      await file.save();
+    }
+
+    return ids.map(id => byId.get(id));
+  }
+
+  /**
+   * Пересортировка папок внутри одного уровня вложенности (родителя или
+   * корня) — аналогично reorderFiles.
+   *
+   * @param {string[]} ids - id папок в новом порядке
+   * @param {object} user
+   * @return {object[]} обновлённые папки
+   * @static
+  */
+  static async reorderFolders(ids, user) {
+    const folders = await FileFolderModel.getByIdsForUser(ids, user.f.id);
+    if (folders.length !== ids.length) {
+      throw new Error('Some folders not found or access denied');
+    }
+
+    const byId = new Map(folders.map(f => [f.f.id, f]));
+    for (let i = 0; i < ids.length; i++) {
+      const folder = byId.get(ids[i]);
+      folder.f.order_num = i;
+      await folder.save();
+    }
+
+    return ids.map(id => byId.get(id));
   }
 }

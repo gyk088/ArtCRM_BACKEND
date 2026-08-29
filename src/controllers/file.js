@@ -110,4 +110,22 @@ export default class FileController {
             reply.code(400).send(error)
         }
     }
+
+    static async reorderFiles(request, reply) {
+        try {
+            const files = await FileService.reorderFiles(request.body.ids || [], request.user);
+            return files;
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
+    static async reorderFolders(request, reply) {
+        try {
+            const folders = await FileService.reorderFolders(request.body.ids || [], request.user);
+            return folders;
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
 }

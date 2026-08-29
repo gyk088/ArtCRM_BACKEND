@@ -25,7 +25,8 @@ export default class FileModel extends PgObject {
             user_id: {
                 required: true
             },
-            folder_id: {}
+            folder_id: {},
+            order_num: {}
         }
     }
 
@@ -42,10 +43,14 @@ export default class FileModel extends PgObject {
      * @return {object} result - объект с файлами и метаинформацией
      * @static
   */
-  static async getAllByUserWithPagination(user, page = 1, limit = 10) {    
+  static async getAllByUserWithPagination(user, page = 1, limit = 10) {
       const offset = (page - 1) * limit;
+      // order_num — ручной порядок (drag&drop), задаётся только при явной
+      // пересортировке; NULLS FIRST — ещё не отсортированные вручную новые
+      // файлы всегда показываются раньше уже упорядоченных (как раньше,
+      // когда порядок определялся только датой создания).
       const files = await FileModel.select(
-        'WHERE user_id = $1 ORDER BY ctime DESC', 
+        'WHERE user_id = $1 ORDER BY order_num ASC NULLS FIRST, ctime DESC',
         [user.f.id]
       );
       
@@ -84,7 +89,25 @@ export default class FileModel extends PgObject {
   }
 
   static async getByFolderId(folderId, userId) {
-      const files = await FileModel.select('WHERE folder_id = $1 AND user_id = $2 ORDER BY ctime DESC', [folderId, userId]);
+      const files = await FileModel.select(
+        'WHERE folder_id = $1 AND user_id = $2 ORDER BY order_num ASC NULLS FIRST, ctime DESC',
+        [folderId, userId]
+      );
       return files;
+  }
+
+  /**
+   * Проверить, что все переданные id файлов принадлежат пользователю, и
+   * получить их модели — нужно перед пересортировкой (reorder), чтобы
+   * нельзя было проставить order_num чужому файлу.
+   *
+   * @param {string[]} ids
+   * @param {string} userId
+   * @static
+  */
+  static async getByIdsForUser(ids, userId) {
+      if (!ids.length) return [];
+      const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
+      return FileModel.select(`WHERE user_id = $1 AND id IN (${placeholders})`, [userId, ...ids]);
   }
 }

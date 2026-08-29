@@ -14,4 +14,6 @@ export default async function fileRoutes(fastify) {
   fastify.get('/folder/:folderId', {preHandler: [auth()]}, FileController.getFilesInFolder)
   fastify.patch('/:fileId/folder', {preHandler: [auth()]}, FileController.moveFileToFolder)
   fastify.delete('/folder/:folderId', {preHandler: [auth()]}, FileController.deleteFolder)
+  fastify.patch('/reorder', {preHandler: [auth()]}, FileController.reorderFiles)
+  fastify.patch('/folder/reorder', {preHandler: [auth()]}, FileController.reorderFolders)
 }
