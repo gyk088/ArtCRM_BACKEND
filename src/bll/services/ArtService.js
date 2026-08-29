@@ -339,6 +339,7 @@ export default class ArtService {
         }
 
         status.f.name = statusData.name !== undefined ? statusData.name : status.f.name;
+        status.f.color = statusData.color !== undefined ? statusData.color : status.f.color;
 
         await status.save();
         return status;

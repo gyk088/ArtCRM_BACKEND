@@ -36,6 +36,42 @@ export default class CollectionModel extends PgObject {
       imported: {
         default: false
       },
+      // Показ цен работ в ссылке в другой валюте, чем они заведены у
+      // художника (например, работы в RUB, а ссылка — в EUR).
+      // display_currency = null означает "без переопределения" — цены
+      // показываются как есть, в исходной валюте работы.
+      display_currency: {
+        set(currency) {
+          if (!currency) return null;
+          const allowed = ['RUB', 'BYN', 'USD', 'EUR'];
+          if (!allowed.includes(currency)) {
+            throw new Error(`Invalid display_currency: must be one of ${allowed.join(', ')}`);
+          }
+          return currency;
+        }
+      },
+      currency_rate: {
+        default: 1,
+        set(rate) {
+          if (rate === null || rate === undefined) return null;
+          const num = Number(rate);
+          if (Number.isNaN(num) || num <= 0) {
+            throw new Error('currency_rate must be a positive number');
+          }
+          return num;
+        }
+      },
+      currency_rounding: {
+        default: 1,
+        set(step) {
+          if (step === null || step === undefined) return null;
+          const num = Number(step);
+          if (Number.isNaN(num) || num <= 0) {
+            throw new Error('currency_rounding must be a positive number');
+          }
+          return num;
+        }
+      },
       ctime: {
         default: new Date()
       },

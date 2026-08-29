@@ -7,7 +7,16 @@ export default class MyStatus extends PgObject {
         pk: true
       },
       user_id: {},
-      name: {}
+      name: {},
+      color: {
+        set(color) {
+          if (!color) return null;
+          if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+            throw new Error('Invalid color: must be a hex string like #8a6d2f');
+          }
+          return color.toLowerCase();
+        }
+      }
     }
   }
 

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= collection.name || 'Без названия' %><%= artistName ? ' — ' + artistName : '' %></title>
+
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="<%= collection.name || 'Без названия' %>" />
+  <meta property="og:description" content="<%= ogDescription %>" />
+  <% if (coverImage) { %>
+  <meta property="og:image" content="<%= coverImage %>" />
+  <% } %>
+  <meta property="og:url" content="<%= pageUrl %>" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="stylesheet" href="/static/collection.css" />
+
+  <!-- Определяем тему до первой отрисовки — иначе будет мигание неверной темой -->
+  <script>
+    (function () {
+      var KEY = 'collectionLandingTheme';
+      var stored = null;
+      try { stored = localStorage.getItem(KEY); } catch (e) {}
+      var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+      var theme = stored || (prefersLight ? 'light' : 'dark');
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
+</head>
+<body>
+  <div class="landing" id="landing">
+
+    <% if (artistName) { %>
+    <div class="artist-bar" id="artistBar"><%= artistName %></div>
+    <% } %>
+
+    <button class="theme-toggle" type="button" id="themeToggle" aria-label="Переключить тему">
+      <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.6" />
+        <path stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.4 5.6l-1.55 1.55M7.15 16.85 5.6 18.4M18.4 18.4l-1.55-1.55M7.15 7.15 5.6 5.6" />
+      </svg>
+      <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M20.5 14.4A8.5 8.5 0 1 1 9.6 3.5a7 7 0 0 0 10.9 10.9Z" />
+      </svg>
+    </button>
+
+    <div class="collection-landing">
+      <header class="hero <%= coverImage ? '' : 'no-image' %>">
+        <% if (coverImage) { %>
+        <div class="hero-bg" style="background-image: url('<%= coverImage %>')"></div>
+        <% } %>
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <h1 class="hero-title"><%= collection.name || 'Без названия' %></h1>
+          <% if (collection.description) { %>
+          <div class="hero-description"><%- collection.description %></div>
+          <% } %>
+          <div class="hero-meta">
+            <span><%= works.length %> <%= workWord %></span>
+            <% if (artistName) { %>
+            <span class="hero-dot">·</span>
+            <span><%= artistName %></span>
+            <% } %>
+          </div>
+        </div>
+      </header>
+
+      <div class="page-content">
+        <main class="gallery-wrap">
+          <% if (!works.length) { %>
+          <div class="empty-state">В этой ссылке пока нет работ</div>
+          <% } else { %>
+          <div class="gallery-grid">
+            <% works.forEach(function (work, index) { %>
+            <button type="button" class="art-card reveal-on-scroll" data-work-index="<%= index %>">
+              <div class="art-image-wrap">
+                <% if (work.avatar && work.avatar.url) { %>
+                <img src="<%= work.avatar.url %>" alt="<%= work.name %>" class="art-image" />
+                <% } else { %>
+                <div class="art-placeholder"><%- icons.picture %></div>
+                <% } %>
+              </div>
+              <div class="art-info">
+                <% if (work.artist_name) { %><p class="art-artist"><%= work.artist_name %></p><% } %>
+                <p class="art-title">
+                  <%= work.name || 'Без названия' %><% if (work.year && isFieldVisible('year')) { %>, <%= work.year %><% } %>
+                </p>
+                <% if (work.technique && isFieldVisible('technique')) { %><p class="art-detail"><%= work.technique %></p><% } %>
+                <% if (work.size && isFieldVisible('size')) { %><p class="art-detail"><%= work.size %></p><% } %>
+                <% if (work.status_name && isFieldVisible('status')) { %><p class="art-detail"><%= work.status_name %></p><% } %>
+                <% if (work.price && isFieldVisible('price')) { %><p class="art-price"><%= formatPrice(work.price) %></p><% } %>
+              </div>
+            </button>
+            <% }) %>
+          </div>
+          <% } %>
+        </main>
+
+        <footer class="landing-footer">
+          <span class="footer-brand">ART CRM</span>
+          <% if (artistName) { %><span class="footer-artist"><%= artistName %></span><% } %>
+        </footer>
+      </div>
+    </div>
+
+    <!-- ==== Полноэкранный просмотр работы ==== -->
+    <div class="work-modal" id="workModal">
+      <button class="viewer-close-btn" id="viewerClose" aria-label="Закрыть"><%- icons.close %></button>
+      <button class="viewer-nav-btn viewer-nav-prev" id="viewerPrev" aria-label="Предыдущая работа"><%- icons.left %></button>
+      <button class="viewer-nav-btn viewer-nav-next" id="viewerNext" aria-label="Следующая работа"><%- icons.right %></button>
+
+      <div class="work-modal-content" id="workModalContent">
+        <div class="work-modal-image">
+          <div class="swipe-viewer" id="swipeViewer">
+            <div class="swipe-slide" id="slidePrev"><img class="swipe-image" id="slidePrevImg" alt="" /></div>
+            <div class="swipe-slide swipe-slide-current" id="slideCurrent">
+              <img class="swipe-image" id="slideCurrentImg" alt="" />
+              <div class="art-placeholder large" id="slideCurrentPlaceholder" style="display:none"><%- icons.picture %></div>
+            </div>
+            <div class="swipe-slide" id="slideNext"><img class="swipe-image" id="slideNextImg" alt="" /></div>
+          </div>
+
+          <div class="thumb-row" id="thumbRow"></div>
+        </div>
+
+        <div class="work-modal-details-wrap" id="workModalDetailsWrap">
+          <div class="work-modal-details" id="workModalDetails"></div>
+        </div>
+      </div>
+
+      <div class="viewer-toolbar">
+        <button class="viewer-toolbar-btn" id="toggleInfoBtn" aria-label="Показать/скрыть информацию">
+          <span class="icon-main"><%- icons.eyeInvisible %></span>
+          <span class="icon-alt"><%- icons.eye %></span>
+        </button>
+        <button class="viewer-toolbar-btn" id="toggleZoomBtn" aria-label="Увеличить/уменьшить">
+          <span class="icon-main"><%- icons.zoomIn %></span>
+          <span class="icon-alt"><%- icons.zoomOut %></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script id="collection-data" type="application/json"><%- JSON.stringify({ works: works, visibleFields: collection.visibleFields || {} }) %></script>
+  <script src="/static/collection.js" defer></script>
+</body>
+</html>

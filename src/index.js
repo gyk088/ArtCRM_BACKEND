@@ -6,10 +6,13 @@ import authRoutes from './routes/v1/auth/index.js'
 import fileRoutes from './routes/v1/file/index.js'
 import collectionRoutes from './routes/v1/collection/index.js'
 import adminRoutes from './routes/v1/admin/index.js'
+import publicPageRoutes from './routes/public/index.js'
 import AuditLogModel from './bll/models/AuditLogModel.js'
 
-import fastifyMultipart from '@fastify/multipart'  
+import fastifyMultipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
+import fastifyView from '@fastify/view'
+import ejs from 'ejs'
 import cors from '@fastify/cors'  // Добавьте импорт
 import { PgObject } from 'pgobject'
 import { Pool } from 'pg'
@@ -22,7 +25,10 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 const fastify = Fastify({
-  logger: true
+  logger: true,
+  // За nginx-реверс-прокси (см. deploy) — иначе request.protocol всегда 'http'
+  // и og:url на странице ссылки рендерился бы с неверной схемой.
+  trustProxy: true
 })
 
 fastify.register(fastifyMultipart, {
@@ -41,6 +47,20 @@ await fastify.register(fastifyStatic, {
   root: path.join(__dirname, '..', 'files'), // папка со статикой
 })
 
+// статика (css/js) для серверно рендерённых публичных страниц — отдельный
+// prefix и decorateReply: false, т.к. @fastify/static уже зарегистрирован выше
+await fastify.register(fastifyStatic, {
+  root: path.join(__dirname, '..', 'public'),
+  prefix: '/static/',
+  decorateReply: false,
+})
+
+// шаблонизатор для серверно рендерённых публичных страниц (см. src/views)
+await fastify.register(fastifyView, {
+  engine: { ejs },
+  root: path.join(__dirname, 'views'),
+})
+
 fastify.register(userRoutes, { prefix: '/api/v1/users' })
 fastify.register(artRoutes, { prefix: '/api/v1/art' })
 fastify.register(linkRoutes, { prefix: '/api/v1/links' })
@@ -48,6 +68,7 @@ fastify.register(authRoutes, { prefix: '/api/v1/auth' })
 fastify.register(fileRoutes, { prefix: '/api/v1/file' })
 fastify.register(collectionRoutes, { prefix: '/api/v1/collections' })
 fastify.register(adminRoutes, { prefix: '/api/v1/admin' })
+fastify.register(publicPageRoutes)
 
 // Аудит-лог всех мутирующих запросов, сделанных во время имперсонации —
 // покрывает "все действия" из ТЗ без необходимости расставлять логирование
