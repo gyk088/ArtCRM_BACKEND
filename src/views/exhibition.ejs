@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title><%= collection.name || 'Без названия' %><%= artistName ? ' — ' + artistName : '' %></title>
+  <title><%= exhibition.name || 'Без названия' %><%= artistName ? ' — ' + artistName : '' %></title>
 
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="<%= collection.name || 'Без названия' %>" />
+  <meta property="og:title" content="<%= exhibition.name || 'Без названия' %>" />
   <meta property="og:description" content="<%= ogDescription %>" />
   <% if (coverImage) { %>
   <meta property="og:image" content="<%= coverImage %>" />
@@ -46,33 +46,58 @@
     </button>
 
     <div class="collection-landing">
-      <header class="hero <%= coverImage ? '' : 'no-image' %>">
+      <header class="exhibition hero <%= coverImage ? '' : 'no-image' %>">
         <% if (coverImage) { %>
         <div class="hero-bg" style="background-image: url('<%= coverImage %>')"></div>
         <% } %>
         <div class="hero-overlay"></div>
         <div class="hero-content">
-          <h1 class="hero-title"><%= collection.name || 'Без названия' %></h1>
-          <% if (collection.subtitle) { %>
-          <p class="hero-subtitle"><%= collection.subtitle %></p>
+          <h1 class="hero-title"><%= exhibition.name || 'Без названия' %></h1>
+          <% if (exhibition.subtitle) { %>
+          <p class="hero-subtitle"><%= exhibition.subtitle %></p>
           <% } %>
-          <% if (collection.description) { %>
-          <div class="hero-description"><%- collection.description %></div>
-          <% } %>
+          <% if (heroMetaParts.length) { %>
           <div class="hero-meta">
-            <span><%= works.length %> <%= workWord %></span>
-            <% if (artistName) { %>
-            <span class="hero-dot">·</span>
-            <span><%= artistName %></span>
-            <% } %>
+            <% heroMetaParts.forEach(function (part, i) { %>
+            <% if (i > 0) { %><span class="hero-dot">·</span><% } %>
+            <span><%= part %></span>
+            <% }) %>
           </div>
+          <% } %>
         </div>
       </header>
 
       <div class="page-content">
+        <% if (photos.length || exhibition.description) { %>
+        <section class="exhibition-intro-wrap">
+          <div class="exhibition-intro-grid <%= (!photos.length || !exhibition.description) ? 'single-column' : '' %>">
+            <% if (photos.length) { %>
+            <div class="exhibition-intro-photos">
+              <div class="section-title-public">Галерея</div>
+              <div class="exhibition-photos-grid">
+                <% photos.forEach(function (photo) { %>
+                <figure class="exhibition-photo-card">
+                  <img src="<%= photo.file.url %>" alt="<%= photo.caption || exhibition.name || '' %>" class="exhibition-photo-img" loading="lazy" />
+                  <% if (photo.caption) { %><figcaption class="exhibition-photo-caption"><%= photo.caption %></figcaption><% } %>
+                </figure>
+                <% }) %>
+              </div>
+            </div>
+            <% } %>
+
+            <% if (exhibition.description) { %>
+            <div class="exhibition-intro-text">
+              <div class="section-title-public">Описание</div>
+              <div class="exhibition-description-text"><%- exhibition.description %></div>
+            </div>
+            <% } %>
+          </div>
+        </section>
+        <% } %>
+
         <main class="gallery-wrap">
           <% if (!works.length) { %>
-          <div class="empty-state">В этой ссылке пока нет работ</div>
+          <div class="empty-state">В этой выставке пока нет работ</div>
           <% } else { %>
           <% var showPriceSort = isFieldVisible('price') && isFieldVisible('priceSort'); %>
           <% var showArtistFilter = isFieldVisible('artistFilter') && distinctArtists.length > 1; %>
@@ -179,10 +204,10 @@
 
   <script id="collection-data" type="application/json"><%- JSON.stringify({
     works: works,
-    visibleFields: collection.visibleFields || {},
-    displayCurrency: collection.displayCurrency || null,
-    currencyRate: collection.currencyRate || 1,
-    currencyRounding: collection.currencyRounding || 1
+    visibleFields: exhibition.visibleFields || {},
+    displayCurrency: exhibition.displayCurrency || null,
+    currencyRate: exhibition.currencyRate || 1,
+    currencyRounding: exhibition.currencyRounding || 1
   }) %></script>
   <script src="/static/collection.js" defer></script>
 </body>

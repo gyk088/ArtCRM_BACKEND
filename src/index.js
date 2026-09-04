@@ -5,6 +5,7 @@ import linkRoutes from './routes/v1/link/index.js'
 import authRoutes from './routes/v1/auth/index.js' 
 import fileRoutes from './routes/v1/file/index.js'
 import collectionRoutes from './routes/v1/collection/index.js'
+import exhibitionRoutes from './routes/v1/exhibition/index.js'
 import adminRoutes from './routes/v1/admin/index.js'
 import publicPageRoutes from './routes/public/index.js'
 import AuditLogModel from './bll/models/AuditLogModel.js'
@@ -67,6 +68,7 @@ fastify.register(linkRoutes, { prefix: '/api/v1/links' })
 fastify.register(authRoutes, { prefix: '/api/v1/auth' })
 fastify.register(fileRoutes, { prefix: '/api/v1/file' })
 fastify.register(collectionRoutes, { prefix: '/api/v1/collections' })
+fastify.register(exhibitionRoutes, { prefix: '/api/v1/exhibitions' })
 fastify.register(adminRoutes, { prefix: '/api/v1/admin' })
 fastify.register(publicPageRoutes)
 

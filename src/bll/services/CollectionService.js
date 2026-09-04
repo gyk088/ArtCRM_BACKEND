@@ -10,6 +10,7 @@ export default class CollectionService {
         const {
             artist_or_gallery,
             show_technique, show_year, show_seria, show_media, show_location, show_price,
+            show_price_sort, show_artist_filter,
             display_currency, currency_rate, currency_rounding,
             ...rest
         } = collection;
@@ -23,7 +24,9 @@ export default class CollectionService {
                 seria: show_seria,
                 media: show_media,
                 location: show_location,
-                price: show_price
+                price: show_price,
+                priceSort: show_price_sort,
+                artistFilter: show_artist_filter
             },
             displayCurrency: display_currency,
             currencyRate: currency_rate,
@@ -50,6 +53,7 @@ export default class CollectionService {
         const collection = new CollectionModel({
             user_id: userId,
             name: data.name,
+            subtitle: data.subtitle || null,
             artist_or_gallery: data.artistOrGallery,
             description: data.description,
             avatar_id: data.avatar?.id || null,
@@ -59,6 +63,8 @@ export default class CollectionService {
             show_media: data.visibleFields?.media !== false,
             show_location: data.visibleFields?.location !== false,
             show_price: data.visibleFields?.price !== false,
+            show_price_sort: data.visibleFields?.priceSort !== false,
+            show_artist_filter: data.visibleFields?.artistFilter !== false,
             imported: !!data.imported,
             display_currency: data.displayCurrency ?? null,
             currency_rate: data.currencyRate ?? 1,
@@ -103,6 +109,7 @@ export default class CollectionService {
         }
 
         if (data.name !== undefined) collection.f.name = data.name;
+        if (data.subtitle !== undefined) collection.f.subtitle = data.subtitle;
         if (data.artistOrGallery !== undefined) collection.f.artist_or_gallery = data.artistOrGallery;
         if (data.description !== undefined) collection.f.description = data.description;
         if (data.avatar !== undefined) collection.f.avatar_id = data.avatar?.id || null;
@@ -118,6 +125,8 @@ export default class CollectionService {
             if (vf.media !== undefined) collection.f.show_media = !!vf.media;
             if (vf.location !== undefined) collection.f.show_location = !!vf.location;
             if (vf.price !== undefined) collection.f.show_price = !!vf.price;
+            if (vf.priceSort !== undefined) collection.f.show_price_sort = !!vf.priceSort;
+            if (vf.artistFilter !== undefined) collection.f.show_artist_filter = !!vf.artistFilter;
         }
 
         await collection.save();

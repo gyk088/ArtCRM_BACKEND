@@ -4,4 +4,5 @@ import PublicPageController from '../../controllers/publicPage.js'
 // т.к. это не JSON API, а страницы для браузера/шаринга в мессенджерах.
 export default async function publicPageRoutes(fastify, _options) {
     fastify.get('/collection/:id', PublicPageController.collectionLanding)
+    fastify.get('/exhibition/:id', PublicPageController.exhibitionLanding)
 }

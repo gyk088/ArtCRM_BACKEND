@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap');
 
 * {
   box-sizing: border-box;
@@ -88,8 +88,12 @@ html[data-theme="light"] .landing {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, background 0.3s ease, color 0.3s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.3s ease, color 0.3s ease, top 0.3s ease;
   box-shadow: var(--shadow);
+}
+
+.theme-toggle.scrolled {
+  top: 7px;
 }
 
 .theme-toggle:hover {
@@ -212,6 +216,10 @@ html[data-theme="light"] .theme-icon-sun {
   background: var(--bg-soft);
 }
 
+.exhibition.hero {
+  min-height: 10vh;
+}
+
 .hero.no-image {
   min-height: 38vh;
 }
@@ -300,6 +308,7 @@ html[data-theme="light"] .hero-bg {
 }
 
 .hero-title,
+.hero-subtitle,
 .hero-description,
 .hero-meta {
   opacity: 0;
@@ -316,6 +325,20 @@ html[data-theme="light"] .hero-bg {
   margin: 0 0 20px;
   color: var(--hero-title-color);
   animation-delay: 0.15s;
+}
+
+/* Короткая подпись под названием — крупнее описания, но заметно мельче
+   заголовка; не курсивом (в отличие от .hero-description), чтобы читалась
+   как отдельный, более весомый уровень иерархии. */
+.hero-subtitle {
+  flex-shrink: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
+  font-size: clamp(18px, 2.6vw, 24px);
+  line-height: 1.4;
+  margin: 0 0 16px;
+  color: var(--hero-body-color);
+  animation-delay: 0.22s;
 }
 
 .hero-description {
@@ -382,6 +405,110 @@ html[data-theme="light"] .hero-bg {
   }
 }
 
+/* ==== Галерея + описание события (только страница выставки) ====
+   Классическая витрина каталога: слева фото экспозиции, справа — текст
+   описания (раньше жил внутри hero, поверх фонового изображения). */
+.exhibition-intro-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 56px 32px 0;
+}
+
+.exhibition-intro-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 48px;
+  align-items: start;
+}
+
+.exhibition-intro-grid.single-column {
+  grid-template-columns: 1fr;
+}
+
+.section-title-public {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 600;
+  font-size: 26px;
+  color: var(--text-title);
+  margin: 0 0 20px;
+}
+
+.exhibition-description-text {
+  font-size: 17px;
+  font-weight: 300;
+  line-height: 1.75;
+  color: var(--text-body);
+}
+
+.exhibition-description-text p {
+  margin: 0 0 14px;
+}
+
+.exhibition-description-text p:last-child {
+  margin-bottom: 0;
+}
+
+.exhibition-description-text ul,
+.exhibition-description-text ol {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+
+.exhibition-description-text blockquote {
+  margin: 0 0 14px;
+  padding-left: 14px;
+  border-left: 3px solid var(--accent);
+  color: var(--text-muted);
+}
+
+.exhibition-photos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 24px;
+}
+
+.exhibition-intro-grid:not(.single-column) .exhibition-photos-grid {
+  grid-template-columns: 1fr;
+}
+
+.exhibition-photo-card {
+  margin: 0;
+  overflow: hidden;
+}
+
+.exhibition-photo-img {
+  width: 100%;
+  height: auto;
+  max-height: 480px;
+  /* Не растягиваем и не обрезаем — если из-за max-height фото уже не
+     совпадает по пропорциям с получившейся рамкой, contain вписывает его
+     целиком, добавляя поля цветом карточки, а не кроп/искажение. */
+  object-fit: contain;
+  display: block;
+}
+
+/* Классическая музейная этикетка — центрированная подпись под тонкой
+   короткой линейкой, а не обычный подрисуночный текст слева. */
+.exhibition-photo-caption {
+  padding: 16px 20px 18px;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--text-body);
+  text-align: center;
+}
+
+.exhibition-photo-caption::before {
+  content: "";
+  display: block;
+  width: 26px;
+  height: 1px;
+  margin: 0 auto 12px;
+  background: var(--accent);
+}
+
 /* ==== Gallery ==== */
 .gallery-wrap {
   max-width: 1100px;
@@ -396,19 +523,16 @@ html[data-theme="light"] .hero-bg {
   color: var(--text-faint);
 }
 
+.empty-state[hidden] {
+  display: none;
+}
+
 .gallery-toolbar {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
   margin-bottom: 28px;
-}
-
-.sort-toolbar-label {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-faint);
 }
 
 .sort-chip-group {
@@ -446,6 +570,111 @@ html[data-theme="light"] .hero-bg {
   font-size: 11px;
 }
 
+/* Мультиселект-фильтр по художникам */
+.artist-filter {
+  position: relative;
+}
+
+.artist-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-faint);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.artist-filter-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-body);
+}
+
+.artist-filter-btn.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 500;
+}
+
+.artist-filter-chevron {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.artist-filter-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 5;
+  min-width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow, 0 12px 32px rgba(0, 0, 0, 0.2));
+}
+
+/* Author-стиль display:flex выше по каскаду, чем UA-стиль для [hidden] —
+   без этого правила панель оставалась бы видимой даже после того, как JS
+   проставляет hidden (тот же баг, что был у .art-card, см. выше по файлу). */
+.artist-filter-panel[hidden] {
+  display: none;
+}
+
+.artist-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-body);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.artist-filter-option:hover {
+  background: var(--border-soft, rgba(255, 255, 255, 0.06));
+}
+
+.artist-filter-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.artist-filter-clear {
+  margin-top: 6px;
+  padding: 7px 8px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text-faint);
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.artist-filter-clear:hover {
+  color: var(--accent);
+}
+
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -463,6 +692,12 @@ html[data-theme="light"] .hero-bg {
   font: inherit;
   color: inherit;
   display: block;
+}
+
+/* Author-стиль display:block выше по каскаду, чем UA-стиль для [hidden] —
+   без этого правила скрытая фильтром карточка продолжила бы отображаться. */
+.art-card[hidden] {
+  display: none;
 }
 
 .art-image-wrap {
@@ -526,6 +761,21 @@ html[data-theme="light"] .hero-bg {
   margin: 0 0 2px;
 }
 
+/* Пилюля статуса — тонировка/бордер/текст цветом статуса (задаётся в
+   Справочнике), инлайн-стилем через statusPillStyle()/hexToRgba(); без
+   заданного цвета остаётся нейтральной за счёт этих же дефолтов. */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+}
+
 .art-price {
   font-size: 13px;
   font-weight: 400;
@@ -566,6 +816,15 @@ html[data-theme="light"] .hero-bg {
 }
 
 @media (max-width: 760px) {
+  .exhibition-intro-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .exhibition-intro-grid:not(.single-column) .exhibition-photos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+
   .theme-toggle {
     top: 9px;
     right: 14px;
@@ -824,12 +1083,8 @@ html[data-theme="light"] .hero-bg {
   transition: opacity 0.25s ease;
 }
 
-.work-status-text {
-  display: block;
-  font-style: italic;
-  font-size: 13px;
-  color: var(--text-dim);
-  margin: 0 0 4px;
+.work-status-detail {
+  margin: 0 0 8px;
 }
 
 .work-modal-artist {
@@ -947,7 +1202,10 @@ html[data-theme="light"] .hero-bg {
     width: 100%;
     flex: none;
     height: auto;
-    padding: 24px 16px 4px;
+    /* Верхний отступ увеличен, чтобы кнопка закрытия и тулбар (см. ниже —
+       на мобильном они оба в верхней строке) не наезжали на само
+       изображение, а помещались в свободном поле над ним. */
+    padding: 68px 16px 4px;
   }
 
   .work-modal-content.info-hidden .work-modal-image {
@@ -984,9 +1242,37 @@ html[data-theme="light"] .hero-bg {
     margin-top: 4px;
   }
 
+  /* Стрелки назад/вперёд убраны с изображения — на тач-устройствах
+     переключение между работами и так уже делается свайпом. */
+  .viewer-nav-btn {
+    display: none;
+  }
+
+  /* Тулбар (инфо/зум) и кнопка закрытия висели поверх самого изображения
+     (fixed снизу-справа и сверху-справа соответственно). На мобильном
+     переносим тулбар в ту же верхнюю строку, что и крестик закрытия —
+     обе группы кнопок теперь просто чуть уменьшенная «шапка» над фото,
+     а не элементы управления, наложенные на картинку. */
   .viewer-toolbar {
-    right: 22px;
-    bottom: 22px;
+    top: 12px;
+    left: 16px;
+    right: auto;
+    bottom: auto;
+    gap: 8px;
+  }
+
+  .viewer-toolbar-btn {
+    width: 40px;
+    height: 40px;
+    background: #ffffff;
+    color: #1a1814;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  }
+
+  .viewer-toolbar-btn .icon-main svg,
+  .viewer-toolbar-btn .icon-alt svg {
+    width: 20px;
+    height: 20px;
   }
 
   .viewer-close-btn {

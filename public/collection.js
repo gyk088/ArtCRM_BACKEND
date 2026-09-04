@@ -43,6 +43,25 @@
     return new Intl.NumberFormat('ru-RU').format(value) + ' ' + symbol;
   }
 
+  function hexToRgba(hex, alpha) {
+    var clean = (hex || '').replace('#', '');
+    if (clean.length !== 6) return null;
+    var bigint = parseInt(clean, 16);
+    if (isNaN(bigint)) return null;
+    var r = (bigint >> 16) & 255;
+    var g = (bigint >> 8) & 255;
+    var b = bigint & 255;
+    return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha + ')';
+  }
+
+  // Зеркалит statusPillStyle() из src/controllers/publicPage.js — та же
+  // тонировка/бордер/текст цветом статуса, что и на карточках в сетке.
+  function statusPillStyle(color) {
+    var tint = hexToRgba(color, 0.12);
+    if (!tint) return '';
+    return 'background:' + tint + ';color:' + color + ';border-color:' + color + ';';
+  }
+
   function escapeHtml(str) {
     var div = document.createElement('div');
     div.textContent = str == null ? '' : String(str);
@@ -62,14 +81,17 @@
 
   // ================= Плашка артиста при прокрутке =================
   var artistBar = document.getElementById('artistBar');
+  var themeToggle = document.getElementById('themeToggle');
   var SCROLL_BAR_THRESHOLD = 24;
 
   function handleScroll() {
     if (!artistBar) return;
     if (window.scrollY > SCROLL_BAR_THRESHOLD) {
       artistBar.classList.add('scrolled');
+      themeToggle.classList.add('scrolled');
     } else {
       artistBar.classList.remove('scrolled');
+      themeToggle.classList.remove('scrolled');
     }
   }
   window.addEventListener('scroll', handleScroll, { passive: true });
@@ -252,7 +274,7 @@
     html += '</dl>';
 
     if (work.status_name && isFieldVisible('status')) {
-      html += '<span class="work-status-text">' + escapeHtml(work.status_name) + '</span>';
+      html += '<p class="work-status-detail"><span class="status-pill" style="' + escapeHtml(statusPillStyle(work.status_color)) + '">' + escapeHtml(work.status_name) + '</span></p>';
     }
     if (work.description) {
       html += '<p class="work-description">' + escapeHtml(work.description) + '</p>';
@@ -347,81 +369,133 @@
     });
   });
 
-  // ================= Сортировка (название / художник / цена) =================
-  // Клик по чипу: неактивный -> активный по возрастанию; активный по
-  // возрастанию -> по убыванию; активный по убыванию -> снова "по умолчанию"
-  // (сброс). Так не нужна отдельная кнопка сброса — она встроена в сам чип.
+  // ================= Сортировка по цене + фильтр по художникам =================
+  // Клик по чипу цены: неактивный -> по возрастанию -> по убыванию -> снова
+  // "по умолчанию" (сброс). Фильтр по художникам — мультиселект (чекбоксы в
+  // выпадающей панели): работа показывается, если её художник отмечен (или
+  // если ничего не отмечено — тогда показываются все).
   var galleryGrid = document.querySelector('.gallery-grid');
-  var sortChips = Array.prototype.slice.call(document.querySelectorAll('.sort-chip'));
-  var sortState = { field: null, dir: 'asc' };
+  var filteredEmptyState = document.getElementById('filteredEmptyState');
+  var sortChip = document.querySelector('.sort-chip[data-sort-field="price"]');
+  var sortState = { active: false, dir: 'asc' };
+
+  var artistFilter = document.getElementById('artistFilter');
+  var artistFilterBtn = document.getElementById('artistFilterBtn');
+  var artistFilterPanel = document.getElementById('artistFilterPanel');
+  var artistFilterLabel = document.getElementById('artistFilterLabel');
+  var artistFilterClear = document.getElementById('artistFilterClear');
+  var artistCheckboxes = Array.prototype.slice.call(document.querySelectorAll('.artist-filter-checkbox'));
+  var selectedArtists = new Set();
 
   function priceOf(work) {
     var num = Number(work.price);
     return work.price != null && !Number.isNaN(num) ? num : null;
   }
 
-  function sortValue(work, field) {
-    if (field === 'price') return priceOf(work);
-    if (field === 'artist') return (work.artist_name || '').trim().toLowerCase() || null;
-    if (field === 'name') return (work.name || '').trim().toLowerCase() || null;
-    return null;
+  function updateSortChipUI() {
+    if (!sortChip) return;
+    sortChip.classList.toggle('active', sortState.active);
+    sortChip.querySelector('.sort-chip-arrow').textContent = sortState.active ? (sortState.dir === 'asc' ? ' ↑' : ' ↓') : '';
   }
 
-  function updateSortChipsUI() {
-    sortChips.forEach(function (chip) {
-      var active = chip.dataset.sortField === sortState.field;
-      chip.classList.toggle('active', active);
-      chip.querySelector('.sort-chip-arrow').textContent = active ? (sortState.dir === 'asc' ? ' ↑' : ' ↓') : '';
-    });
+  function updateArtistFilterUI() {
+    if (!artistFilterLabel) return;
+    artistFilterLabel.textContent = selectedArtists.size ? 'Художник (' + selectedArtists.size + ')' : 'Художник';
+    if (artistFilterBtn) artistFilterBtn.classList.toggle('active', selectedArtists.size > 0);
   }
 
-  function applySort() {
+  // Пересчитывает видимый набор работ (фильтр по художникам) и их порядок
+  // (сортировка по цене), затем применяет к DOM: скрывает нужные карточки
+  // и физически переставляет оставшиеся в новом порядке.
+  function applyDisplay() {
     var indices = works.map(function (_, i) { return i; });
-    var field = sortState.field;
-    var dir = sortState.dir;
 
-    if (field) {
+    if (selectedArtists.size) {
+      indices = indices.filter(function (i) {
+        return selectedArtists.has(works[i].artist_name || '');
+      });
+    }
+
+    if (sortState.active) {
+      var dir = sortState.dir;
       indices.sort(function (a, b) {
-        var va = sortValue(works[a], field);
-        var vb = sortValue(works[b], field);
-        // Работы без значения по выбранному полю — всегда в конце.
-        if (va === null && vb === null) return 0;
-        if (va === null) return 1;
-        if (vb === null) return -1;
-        if (typeof va === 'string') {
-          var cmp = va.localeCompare(vb, 'ru');
-          return dir === 'asc' ? cmp : -cmp;
-        }
-        return dir === 'asc' ? va - vb : vb - va;
+        var pa = priceOf(works[a]);
+        var pb = priceOf(works[b]);
+        if (pa === null && pb === null) return 0;
+        if (pa === null) return 1;
+        if (pb === null) return -1;
+        return dir === 'asc' ? pa - pb : pb - pa;
       });
     }
 
     displayOrder = indices;
 
     if (galleryGrid) {
+      var visible = new Set(indices);
+      works.forEach(function (_, i) {
+        var card = galleryGrid.querySelector('.art-card[data-work-index="' + i + '"]');
+        if (card) card.hidden = !visible.has(i);
+      });
       indices.forEach(function (workIndex) {
         var card = galleryGrid.querySelector('.art-card[data-work-index="' + workIndex + '"]');
         if (card) galleryGrid.appendChild(card);
       });
     }
+
+    if (filteredEmptyState) {
+      filteredEmptyState.hidden = !(works.length && indices.length === 0);
+    }
   }
 
-  sortChips.forEach(function (chip) {
-    chip.addEventListener('click', function () {
-      var field = chip.dataset.sortField;
-      if (sortState.field !== field) {
-        sortState.field = field;
+  if (sortChip) {
+    sortChip.addEventListener('click', function () {
+      if (!sortState.active) {
+        sortState.active = true;
         sortState.dir = 'asc';
       } else if (sortState.dir === 'asc') {
         sortState.dir = 'desc';
       } else {
-        sortState.field = null;
+        sortState.active = false;
         sortState.dir = 'asc';
       }
-      updateSortChipsUI();
-      applySort();
+      updateSortChipUI();
+      applyDisplay();
     });
-  });
+  }
+
+  if (artistFilterBtn && artistFilterPanel) {
+    artistFilterBtn.addEventListener('click', function (event) {
+      event.stopPropagation();
+      var isOpen = !artistFilterPanel.hidden;
+      artistFilterPanel.hidden = isOpen;
+      artistFilterBtn.setAttribute('aria-expanded', String(!isOpen));
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!artistFilterPanel.hidden && artistFilter && !artistFilter.contains(event.target)) {
+        artistFilterPanel.hidden = true;
+        artistFilterBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    artistCheckboxes.forEach(function (checkbox) {
+      checkbox.addEventListener('change', function () {
+        if (checkbox.checked) selectedArtists.add(checkbox.value);
+        else selectedArtists.delete(checkbox.value);
+        updateArtistFilterUI();
+        applyDisplay();
+      });
+    });
+
+    if (artistFilterClear) {
+      artistFilterClear.addEventListener('click', function () {
+        selectedArtists.clear();
+        artistCheckboxes.forEach(function (cb) { cb.checked = false; });
+        updateArtistFilterUI();
+        applyDisplay();
+      });
+    }
+  }
 
   viewerClose.addEventListener('click', closeViewer);
   toggleInfoBtn.addEventListener('click', function () {

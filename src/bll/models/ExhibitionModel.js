@@ -1,7 +1,7 @@
 import { PgObject } from 'pgobject';
 import { getFileBaseUrl } from '../utils/const.js';
 
-export default class CollectionModel extends PgObject {
+export default class ExhibitionModel extends PgObject {
   static get schema() {
     return {
       id: {
@@ -11,11 +11,12 @@ export default class CollectionModel extends PgObject {
         required: true
       },
       name: {},
-      // Короткая подпись под названием на публичной странице — между
-      // заголовком и полным описанием (не то же самое, что description).
       subtitle: {},
-      artist_or_gallery: {},
       description: {},
+      artist_or_gallery: {},
+      venue: {},
+      start_date: {},
+      end_date: {},
       avatar_id: {},
       show_technique: {
         default: true
@@ -35,21 +36,12 @@ export default class CollectionModel extends PgObject {
       show_price: {
         default: true
       },
-      // Инструменты публичной страницы ссылки (сортировка/фильтр) — можно
-      // отключить, если владелец не хочет их показывать посетителям.
       show_price_sort: {
         default: true
       },
       show_artist_filter: {
         default: true
       },
-      imported: {
-        default: false
-      },
-      // Показ цен работ в ссылке в другой валюте, чем они заведены у
-      // художника (например, работы в RUB, а ссылка — в EUR).
-      // display_currency = null означает "без переопределения" — цены
-      // показываются как есть, в исходной валюте работы.
       display_currency: {
         set(currency) {
           if (!currency) return null;
@@ -92,56 +84,56 @@ export default class CollectionModel extends PgObject {
   }
 
   static get table() {
-    return 'my_collection';
+    return 'my_exhibition';
   }
 
   static async getById(id) {
-    const rows = await CollectionModel.select('WHERE id = $1 LIMIT 1', [id]);
+    const rows = await ExhibitionModel.select('WHERE id = $1 LIMIT 1', [id]);
     return rows[0];
   }
 
   static async getByUserId(userId) {
-    const rows = await CollectionModel.select('WHERE user_id = $1 ORDER BY ctime DESC', [userId]);
+    const rows = await ExhibitionModel.select('WHERE user_id = $1 ORDER BY ctime DESC', [userId]);
     return rows;
   }
 
   /**
-   * Получить все ссылки пользователя с резолвленной обложкой (avatar)
+   * Получить все выставки пользователя с резолвленной обложкой (avatar)
    *
    * @param {string} userId - ID пользователя-владельца
-   * @return {object[]} collections - объекты с полем avatar: {id, ext, name, url} | null
+   * @return {object[]} exhibitions - объекты с полем avatar: {id, ext, name, url} | null
    * @static
   */
   static async getAllWithAvatar(userId) {
     const query = `
-      SELECT c.*, f.id as f_id, f.ext as f_ext, f.name as f_name
-      FROM my_collection c
-      LEFT JOIN my_file f ON c.avatar_id = f.id
-      WHERE c.user_id = $1
-      ORDER BY c.ctime DESC
+      SELECT e.*, f.id as f_id, f.ext as f_ext, f.name as f_name
+      FROM my_exhibition e
+      LEFT JOIN my_file f ON e.avatar_id = f.id
+      WHERE e.user_id = $1
+      ORDER BY e.ctime DESC
     `;
     const result = await PgObject.query(query, [userId]);
-    return result.rows.map(CollectionModel.__withAvatar);
+    return result.rows.map(ExhibitionModel.__withAvatar);
   }
 
   /**
-   * Получить ссылку по ID с резолвленной обложкой (avatar)
+   * Получить выставку по ID с резолвленной обложкой (avatar)
    *
-   * @param {string} id - ID ссылки
-   * @return {object|null} collection - объект с полем avatar: {id, ext, name, url} | null
+   * @param {string} id - ID выставки
+   * @return {object|null} exhibition - объект с полем avatar: {id, ext, name, url} | null
    * @static
   */
   static async getByIdWithAvatar(id) {
     const query = `
-      SELECT c.*, f.id as f_id, f.ext as f_ext, f.name as f_name
-      FROM my_collection c
-      LEFT JOIN my_file f ON c.avatar_id = f.id
-      WHERE c.id = $1
+      SELECT e.*, f.id as f_id, f.ext as f_ext, f.name as f_name
+      FROM my_exhibition e
+      LEFT JOIN my_file f ON e.avatar_id = f.id
+      WHERE e.id = $1
       LIMIT 1
     `;
     const result = await PgObject.query(query, [id]);
     const row = result.rows[0];
-    return row ? CollectionModel.__withAvatar(row) : null;
+    return row ? ExhibitionModel.__withAvatar(row) : null;
   }
 
   static __withAvatar(row) {

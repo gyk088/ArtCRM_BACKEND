@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Выставка не найдена</title>
+  <link rel="stylesheet" href="/static/collection.css" />
+  <script>
+    (function () {
+      var KEY = 'collectionLandingTheme';
+      var stored = null;
+      try { stored = localStorage.getItem(KEY); } catch (e) {}
+      var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+      document.documentElement.dataset.theme = stored || (prefersLight ? 'light' : 'dark');
+    })();
+  </script>
+</head>
+<body>
+  <div class="landing">
+    <div class="state-screen">
+      <div class="not-found">
+        <div class="not-found-icon">✦</div>
+        <h1>Выставка не найдена</h1>
+        <p>Выставка недействительна или была удалена.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
