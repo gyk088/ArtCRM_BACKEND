@@ -45,7 +45,12 @@ export default class UserModel extends PgObject {
       // Владеющая Галерея (только для role IN ('manager','artist')) — см. CHECK
       // my_user_gallery_scope_check. NULL означает "управляется напрямую Super Admin'ом".
       managed_by_gallery_id: {},
-      created_by: {}
+      created_by: {},
+      // Лимит места на диске в байтах. По умолчанию 5 ГБ — управляется из
+      // Админ-панели (см. UserManagementService.updateStorageLimit).
+      storage_limit_bytes: {
+        default: 5368709120
+      }
     }
   }
 

@@ -1,6 +1,7 @@
 import { PgObject } from 'pgobject';
 import CollectionModel from '../models/CollectionModel.js';
 import CollectionWorkModel from '../models/CollectionWorkModel.js';
+import CollectionFolderModel from '../models/CollectionFolderModel.js';
 
 export default class CollectionService {
     // Превращает плоские show_* колонки в вложенный visibleFields{...}
@@ -149,6 +150,163 @@ export default class CollectionService {
         await collection.delete();
 
         return { success: true, message: 'Collection deleted successfully' };
+    }
+
+    // ============= COLLECTION FOLDER METHODS =============
+    // Группировка ссылок по папкам — та же модель, что и файловый менеджер
+    // (см. FileService: createFolder/updateFolder/deleteFolder/reorder*).
+
+    static async createFolder(folderData, user) {
+        if (folderData.parent_id) {
+            await CollectionService.getFolderById(folderData.parent_id, user);
+        }
+
+        const folder = new CollectionFolderModel({
+            name: folderData.name,
+            user_id: user.f.id,
+            parent_id: folderData.parent_id || null
+        });
+
+        await folder.save();
+        return folder;
+    }
+
+    static async getFolderById(id, user) {
+        const folder = await CollectionFolderModel.getByIdForUser(id, user.f.id);
+        if (!folder) {
+            throw new Error('Folder not found or access denied');
+        }
+        return folder;
+    }
+
+    static async getFoldersByUser(user) {
+        return CollectionFolderModel.getByUserId(user.f.id);
+    }
+
+    static async __getDescendantFolderIds(id, userId) {
+        const children = await CollectionFolderModel.getByParentId(id, userId);
+        let ids = [];
+        for (const child of children) {
+            ids.push(child.f.id);
+            ids = ids.concat(await CollectionService.__getDescendantFolderIds(child.f.id, userId));
+        }
+        return ids;
+    }
+
+    static async updateFolder(id, folderData, user) {
+        const folder = await CollectionService.getFolderById(id, user);
+
+        folder.f.name = folderData.name !== undefined ? folderData.name : folder.f.name;
+
+        if (folderData.parent_id !== undefined) {
+            const newParentId = folderData.parent_id;
+
+            if (newParentId === id) {
+                throw new Error('Cannot move folder into itself');
+            }
+
+            if (newParentId) {
+                await CollectionService.getFolderById(newParentId, user);
+
+                const descendantIds = await CollectionService.__getDescendantFolderIds(id, user.f.id);
+                if (descendantIds.includes(newParentId)) {
+                    throw new Error('Cannot move folder into its own subfolder');
+                }
+            }
+
+            // order_num был позицией среди старых соседей — на новом уровне
+            // он бессмысленен и может случайно совпасть с чужим. Сбрасываем,
+            // чтобы перемещённая папка встала в конец нового уровня.
+            if ((folder.f.parent_id || null) !== (newParentId || null)) {
+                folder.f.order_num = null;
+            }
+
+            folder.f.parent_id = newParentId;
+        }
+
+        await folder.save();
+        return folder;
+    }
+
+    static async __cascadeDeleteFolder(id, user) {
+        const children = await CollectionFolderModel.getByParentId(id, user.f.id);
+        for (const child of children) {
+            await CollectionService.__cascadeDeleteFolder(child.f.id, user);
+        }
+
+        await CollectionModel.clearFolderId(id);
+
+        const folder = await CollectionFolderModel.getByIdForUser(id, user.f.id);
+        await folder.delete();
+    }
+
+    static async deleteFolder(id, user) {
+        await CollectionService.getFolderById(id, user);
+
+        await CollectionService.__cascadeDeleteFolder(id, user);
+        return { success: true, message: 'Folder deleted successfully', id };
+    }
+
+    static async moveCollectionToFolder(collectionId, folderId, user) {
+        if (folderId) {
+            await CollectionService.getFolderById(folderId, user);
+        }
+
+        const collection = await CollectionModel.getById(collectionId);
+        if (!collection || collection.f.user_id !== user.f.id) {
+            throw new Error('Collection not found');
+        }
+
+        collection.f.folder_id = folderId || null;
+        await collection.save();
+        return CollectionService.getCollectionById(collectionId, user.f.id);
+    }
+
+    /**
+     * Пересортировка ссылок внутри одной папки (или корня) — фронтенд
+     * присылает id ссылок в новом визуальном порядке после drag&drop.
+     *
+     * @param {string[]} ids
+     * @param {object} user
+     * @static
+    */
+    static async reorderCollections(ids, user) {
+        const collections = await CollectionModel.getByIdsForUser(ids, user.f.id);
+        if (collections.length !== ids.length) {
+            throw new Error('Some collections not found or access denied');
+        }
+
+        const byId = new Map(collections.map(c => [c.f.id, c]));
+        for (let i = 0; i < ids.length; i++) {
+            const collection = byId.get(ids[i]);
+            collection.f.order_num = i;
+            await collection.save();
+        }
+
+        return ids.map(id => byId.get(id));
+    }
+
+    /**
+     * Пересортировка папок внутри одного уровня вложенности.
+     *
+     * @param {string[]} ids
+     * @param {object} user
+     * @static
+    */
+    static async reorderFolders(ids, user) {
+        const folders = await CollectionFolderModel.getByIdsForUser(ids, user.f.id);
+        if (folders.length !== ids.length) {
+            throw new Error('Some folders not found or access denied');
+        }
+
+        const byId = new Map(folders.map(f => [f.f.id, f]));
+        for (let i = 0; i < ids.length; i++) {
+            const folder = byId.get(ids[i]);
+            folder.f.order_num = i;
+            await folder.save();
+        }
+
+        return ids.map(id => byId.get(id));
     }
 
     // Публичная страница ссылки — без авторизации, поэтому работы

@@ -40,6 +40,23 @@ export default class ExhibitionWorkModel extends PgObject {
   }
 
   /**
+   * Удалить работу из всех выставок, где она состоит — нужно перед удалением
+   * самого арт-объекта, иначе FK my_exhibition_work_art_id_fkey не даст его удалить.
+   *
+   * @param {string} artId - ID арт-объекта
+   * @static
+  */
+  static async removeArtFromAllExhibitions(artId) {
+    const relations = await ExhibitionWorkModel.select('WHERE art_id = $1', [artId]);
+
+    for (const relation of relations) {
+      await relation.delete();
+    }
+
+    return { success: true, deleted: relations.length };
+  }
+
+  /**
    * Полностью заменяет список работ выставки на переданный (в переданном порядке)
    *
    * @param {string} exhibitionId - ID выставки

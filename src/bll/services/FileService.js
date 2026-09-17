@@ -24,6 +24,16 @@ export default class FileService {
     const name = fileFields.name?.value || 'unnamed'
     const comment = fileFields.comment?.value || ''
 
+    const usedBefore = await FileModel.getTotalSizeByUserId(user.f.id)
+    const limit = user.f.storage_limit_bytes ?? FileService.DEFAULT_STORAGE_LIMIT_BYTES
+
+    if (usedBefore >= limit) {
+      // Места уже нет — сливаем стрим, не записывая на диск, иначе запрос
+      // зависнет (fastify-multipart ждёт, пока часть будет вычитана).
+      fileStream.resume()
+      throw FileService.__storageLimitError(usedBefore, limit)
+    }
+
     const fileObj = new FileModel({
       name,
       comment,
@@ -56,6 +66,12 @@ export default class FileService {
       throw new Error(`Файл превышает максимальный размер ${FileService.MAX_FILE_SIZE_MB} МБ`)
     }
 
+    if (usedBefore + fileStream.bytesRead > limit) {
+      fs.unlink(filePath, () => {})
+      await fileObj.delete()
+      throw FileService.__storageLimitError(usedBefore, limit)
+    }
+
     fileObj.f.size = fileStream.bytesRead
     await fileObj.save()
 
@@ -64,6 +80,85 @@ export default class FileService {
 
   static get MAX_FILE_SIZE_MB() {
     return 5
+  }
+
+  static get DEFAULT_STORAGE_LIMIT_BYTES() {
+    return 5 * 1024 * 1024 * 1024 // 5 ГБ
+  }
+
+  static __storageLimitError(used, limit) {
+    const error = new Error('Недостаточно места на диске');
+    error.code = 'STORAGE_LIMIT_EXCEEDED';
+    error.used = used;
+    error.limit = limit;
+    return error;
+  }
+
+  /**
+   * Скопировать существующий файл (по id) в файлы указанного пользователя —
+   * нужно при импорте ссылки/выставки: работы копируются в собственный
+   * каталог целиком, включая обложку и доп. изображения, а не просто
+   * ссылаются на чужой файл по id (тот может позже удалиться у владельца).
+   * Файл ищется без проверки владельца — байты и так публично доступны без
+   * авторизации через GET /:fileId, так что копирование не открывает
+   * ничего, что не было доступно и раньше.
+   *
+   * @param {string} fileId - id исходного файла
+   * @param {object} user - пользователь, которому будет принадлежать копия
+   * @return {object} новый FileModel
+   * @static
+  */
+  static async copyFile(fileId, user) {
+    const sourceFile = await FileModel.getById(fileId);
+    if (!sourceFile) {
+      throw new Error('Source file not found');
+    }
+
+    const usedBefore = await FileModel.getTotalSizeByUserId(user.f.id);
+    const limit = user.f.storage_limit_bytes ?? FileService.DEFAULT_STORAGE_LIMIT_BYTES;
+    const size = sourceFile.f.size || 0;
+
+    if (usedBefore + size > limit) {
+      throw FileService.__storageLimitError(usedBefore, limit);
+    }
+
+    const fileObj = new FileModel({
+      name: sourceFile.f.name,
+      comment: sourceFile.f.comment,
+      filename: sourceFile.f.filename,
+      encoding: sourceFile.f.encoding,
+      mimetype: sourceFile.f.mimetype,
+      size,
+      ext: sourceFile.f.ext,
+      user_id: user.f.id
+    });
+    await fileObj.save();
+
+    const sourcePath = `./files/${sourceFile.f.id}.${sourceFile.f.ext}`;
+    const targetPath = `./files/${fileObj.f.id}.${fileObj.f.ext}`;
+
+    try {
+      await fs.promises.copyFile(sourcePath, targetPath);
+    } catch (err) {
+      await fileObj.delete();
+      throw new Error('Source file is missing on disk');
+    }
+
+    return fileObj;
+  }
+
+  /**
+   * Использовано/доступно места на диске для пользователя — показывается на
+   * фронтенде (страница Файлы, окно "нет места") и в Админ-панели.
+   *
+   * @param {object} user
+   * @return {object} { used, limit, remaining }
+   * @static
+  */
+  static async getStorageInfo(user) {
+    const used = await FileModel.getTotalSizeByUserId(user.f.id);
+    const limit = user.f.storage_limit_bytes ?? FileService.DEFAULT_STORAGE_LIMIT_BYTES;
+    return { used, limit, remaining: Math.max(0, limit - used) };
   }
 
 
@@ -79,6 +174,12 @@ export default class FileService {
     try {
       // Получаем файл и проверяем права доступа
       const file = await this.getFileById(id, user);
+
+      // Отвязываем файл отовсюду, где он используется — иначе удаление
+      // упадёт на внешнем ключе (avatar_id/file_id ссылаются на my_file).
+      // Файл при этом удаляется полностью, работы/ссылки/выставки остаются,
+      // просто теряют эту конкретную картинку (как плейсхолдер).
+      const usage = await FileService.__unlinkFileEverywhere(id);
 
       // Формируем путь к физическому файлу
       const filePath = `./files/${file.f.id}.${file.f.ext}`;
@@ -97,12 +198,40 @@ export default class FileService {
       return {
         success: true,
         message: 'File deleted successfully',
-        id: file.f.id
+        id: file.f.id,
+        unlinkedFrom: usage
       };
     } catch (error) {
       console.error('Error deleting file:', error);
       throw error;
     }
+  }
+
+  /**
+   * Отвязать файл везде, где на него ссылаются (обложка работы, доп.
+   * изображение работы, обложка ссылки/коллекции, обложка и фото галереи
+   * выставки) — вызывается перед удалением самого файла.
+   *
+   * @param {string} fileId
+   * @return {object} сколько записей отвязано/удалено по каждому типу
+   * @static
+  */
+  static async __unlinkFileEverywhere(fileId) {
+    const artAvatars = await FileModel.query('UPDATE my_art_object SET avatar_id = NULL WHERE avatar_id = $1', [fileId]);
+    const artImages = await FileModel.query('DELETE FROM my_art_object_image WHERE file_id = $1', [fileId]);
+    const collectionAvatars = await FileModel.query('UPDATE my_collection SET avatar_id = NULL WHERE avatar_id = $1', [fileId]);
+    const exhibitionAvatars = await FileModel.query('UPDATE my_exhibition SET avatar_id = NULL WHERE avatar_id = $1', [fileId]);
+    const exhibitionPhotos = await FileModel.query('DELETE FROM my_exhibition_photo WHERE file_id = $1', [fileId]);
+    const folderAvatars = await FileModel.query('UPDATE my_file_folder SET avatar_id = NULL WHERE avatar_id = $1', [fileId]);
+
+    return {
+      artObjectAvatars: artAvatars.rowCount,
+      artObjectImages: artImages.rowCount,
+      collectionAvatars: collectionAvatars.rowCount,
+      exhibitionAvatars: exhibitionAvatars.rowCount,
+      exhibitionPhotos: exhibitionPhotos.rowCount,
+      folderAvatars: folderAvatars.rowCount
+    };
   }
 
 
@@ -203,7 +332,7 @@ export default class FileService {
     });
 
     await folder.save();
-    return folder;
+    return FileFolderModel.getByIdWithAvatar(folder.f.id);
   }
 
   static async getFolderById(id, user) {
@@ -260,8 +389,12 @@ export default class FileService {
       folder.f.parent_id = newParentId;
     }
 
+    if (folderData.avatar_id !== undefined) {
+      folder.f.avatar_id = folderData.avatar_id || null;
+    }
+
     await folder.save();
-    return folder;
+    return FileFolderModel.getByIdWithAvatar(folder.f.id);
   }
 
   static async __cascadeDeleteFolder(id, user) {

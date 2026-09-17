@@ -2,12 +2,38 @@ import FileService from '../bll/services/FileService.js';
 
 export default class FileController {
     static async upload(request, reply) {
-        try {        
+        try {
             const data = await request.file();
             const file = await FileService.upload(data, request.user);
             return file
         } catch (error) {
+            if (error.code === 'STORAGE_LIMIT_EXCEEDED') {
+                reply.code(413).send({ error: error.message, code: error.code, used: error.used, limit: error.limit })
+                return
+            }
             reply.code(400).send(error)
+        }
+    }
+
+    static async getStorageInfo(request, reply) {
+        try {
+            const info = await FileService.getStorageInfo(request.user);
+            return info;
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
+    static async copyFile(request, reply) {
+        try {
+            const file = await FileService.copyFile(request.params.fileId, request.user);
+            return file;
+        } catch (error) {
+            if (error.code === 'STORAGE_LIMIT_EXCEEDED') {
+                reply.code(413).send({ error: error.message, code: error.code, used: error.used, limit: error.limit })
+                return
+            }
+            reply.code(400).send({ error: error.message })
         }
     }
 

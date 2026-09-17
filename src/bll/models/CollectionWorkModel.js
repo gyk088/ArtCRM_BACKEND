@@ -40,6 +40,23 @@ export default class CollectionWorkModel extends PgObject {
   }
 
   /**
+   * Удалить работу из всех ссылок, где она состоит — нужно перед удалением
+   * самого арт-объекта, иначе FK my_collection_work_art_id_fkey не даст его удалить.
+   *
+   * @param {string} artId - ID арт-объекта
+   * @static
+  */
+  static async removeArtFromAllCollections(artId) {
+    const relations = await CollectionWorkModel.select('WHERE art_id = $1', [artId]);
+
+    for (const relation of relations) {
+      await relation.delete();
+    }
+
+    return { success: true, deleted: relations.length };
+  }
+
+  /**
    * Полностью заменяет список работ ссылки на переданный (в переданном порядке)
    *
    * @param {string} collectionId - ID ссылки

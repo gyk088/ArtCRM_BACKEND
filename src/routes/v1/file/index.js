@@ -4,6 +4,8 @@ import auth from '../../../hooks/preHendler.js';
 
 export default async function fileRoutes(fastify) {
   fastify.post('/upload', {preHandler: [auth()]}, FileController.upload)
+  fastify.get('/storage', {preHandler: [auth()]}, FileController.getStorageInfo)
+  fastify.post('/:fileId/copy', {preHandler: [auth()]}, FileController.copyFile)
   fastify.get('/:fileId', FileController.getFile)
   fastify.put('/:fileId', {preHandler: [auth()]}, FileController.updateFile)
   fastify.get('/list', {preHandler: [auth()]}, FileController.getAllByUser)

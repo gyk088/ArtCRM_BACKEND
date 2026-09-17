@@ -24,6 +24,9 @@ export default async function adminRoutes(fastify, _options) {
     // Смена email
     fastify.patch('/users/:id/email', {preHandler: [auth([ROLES.SUPER_ADMIN, ROLES.GALLERY])]}, UserManagementController.changeEmail)
 
+    // Изменение лимита места на диске (Manager/Artist/Super Admin)
+    fastify.patch('/users/:id/storage-limit', {preHandler: [auth([ROLES.SUPER_ADMIN, ROLES.GALLERY])]}, UserManagementController.updateStorageLimit)
+
     // Имперсонация ("зайти под пользователем")
     fastify.post('/users/:id/impersonate', {preHandler: [auth([ROLES.SUPER_ADMIN, ROLES.GALLERY])]}, UserManagementController.impersonate)
 

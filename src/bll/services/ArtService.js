@@ -7,6 +7,9 @@ import MyArtist from '../models/ArtistModel.js';
 import LinkArtistModel from '../models/LinkArtistModel.js';
 import MyArtObjectUser from '../models/ArtUserModel.js';
 import ArtImageModel from '../models/ArtImageModel.js';
+import ArtLinkModel from '../models/ArtLinkModel.js';
+import CollectionWorkModel from '../models/CollectionWorkModel.js';
+import ExhibitionWorkModel from '../models/ExhibitionWorkModel.js';
 import { PgObject } from 'pgobject';
 
 export default class ArtService {
@@ -119,6 +122,13 @@ export default class ArtService {
 
         // Удаляем связи доп. изображений
         await ArtImageModel.removeAllImagesFromArt(id);
+
+        // Удаляем связи со ссылками (my_art_object_link)
+        await ArtLinkModel.removeAllLinksFromArt(id);
+
+        // Удаляем работу из всех ссылок (my_collection_work) и выставок (my_exhibition_work)
+        await CollectionWorkModel.removeArtFromAllCollections(id);
+        await ExhibitionWorkModel.removeArtFromAllExhibitions(id);
 
         // Затем удаляем сам объект
         await artObject.delete();

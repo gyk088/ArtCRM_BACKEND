@@ -88,6 +88,20 @@ export default class FileModel extends PgObject {
       return files[0];
   }
 
+  /**
+   * Получить файл по id без проверки владельца — нужно при копировании
+   * файла из чужой публичной ссылки/выставки (см. FileService.copyFile):
+   * файлы и так отдаются публично по id без авторизации (см. GET /:fileId),
+   * так что сам просмотр байтов уже не защищён владением.
+   *
+   * @param {string} id
+   * @static
+  */
+  static async getById(id) {
+      const files = await FileModel.select('WHERE id = $1 LIMIT 1', [id]);
+      return files[0];
+  }
+
   static async getByFolderId(folderId, userId) {
       const files = await FileModel.select(
         'WHERE folder_id = $1 AND user_id = $2 ORDER BY order_num ASC NULLS FIRST, ctime DESC',
@@ -109,5 +123,41 @@ export default class FileModel extends PgObject {
       if (!ids.length) return [];
       const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
       return FileModel.select(`WHERE user_id = $1 AND id IN (${placeholders})`, [userId, ...ids]);
+  }
+
+  /**
+   * Суммарный размер всех файлов пользователя в байтах — используется для
+   * проверки лимита места на диске перед загрузкой нового файла.
+   *
+   * @param {string} userId
+   * @return {number}
+   * @static
+  */
+  static async getTotalSizeByUserId(userId) {
+      const result = await FileModel.query('SELECT COALESCE(SUM(size), 0) as total FROM my_file WHERE user_id = $1', [userId]);
+      return parseInt(result.rows[0].total, 10);
+  }
+
+  /**
+   * То же самое, но сразу для нескольких пользователей одним запросом —
+   * нужно для списка пользователей в Админ-панели (не делать N+1 запросов).
+   *
+   * @param {string[]} userIds
+   * @return {Object<string, number>} map userId -> суммарный размер в байтах
+   * @static
+  */
+  static async getTotalSizeByUserIds(userIds) {
+      if (!userIds.length) return {};
+      const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
+      const result = await FileModel.query(
+        `SELECT user_id, COALESCE(SUM(size), 0) as total FROM my_file WHERE user_id IN (${placeholders}) GROUP BY user_id`,
+        userIds
+      );
+
+      const map = {};
+      for (const row of result.rows) {
+          map[row.user_id] = parseInt(row.total, 10);
+      }
+      return map;
   }
 }

@@ -2,6 +2,7 @@ import UserModel from '../models/UserModel.js';
 import SessionModel from '../models/SessionModel.js';
 import AuditLogModel from '../models/AuditLogModel.js';
 import AuthorizationService from './AuthorizationService.js';
+import FileModel from '../models/FileModel.js';
 import { ROLES, MANAGED_ROLES } from '../utils/const.js';
 import { getRandomPassword, validateEmail } from '../utils/helpers.js';
 
@@ -27,11 +28,24 @@ export default class UserManagementService {
       throw new Error('Forbidden');
     }
 
-    if (AuthorizationService.isSuperAdmin(actor)) {
-      return UserModel.select();
-    }
+    const users = AuthorizationService.isSuperAdmin(actor)
+      ? await UserModel.select()
+      : await UserModel.select('WHERE managed_by_gallery_id = $1', [actor.id]);
 
-    return UserModel.select('WHERE managed_by_gallery_id = $1', [actor.id]);
+    return UserManagementService.__withStorageUsage(users);
+  }
+
+  /**
+   * Подмешивает в список пользователей занятое место на диске
+   * (storage_used_bytes) — одним batch-запросом, без N+1.
+   */
+  static async __withStorageUsage(users) {
+    const usageByUserId = await FileModel.getTotalSizeByUserIds(users.map(u => u.f.id));
+
+    return users.map(user => ({
+      ...user.toJSON(),
+      storage_used_bytes: usageByUserId[user.f.id] || 0
+    }));
   }
 
   /**
@@ -225,6 +239,37 @@ export default class UserManagementService {
     await AuditLogModel.log(actor.id, target.id, 'email_changed', { from: oldEmail, to: email });
 
     return targetUser;
+  }
+
+  /**
+   * Изменение лимита места на диске управляемого пользователя. Права те же,
+   * что и у смены пароля/email (canManageUser) — Super Admin управляет
+   * любым лимитом, Gallery — только своими Manager/Artist.
+   */
+  static async updateStorageLimit(actorUser, targetUserId, limitBytes) {
+    const actor = toActor(actorUser);
+    const targetUser = await UserModel.getUserById(targetUserId);
+    if (!targetUser) throw new Error('User not found');
+
+    const target = toTarget(targetUser);
+
+    if (!AuthorizationService.canManageUser(actor, target)) {
+      throw new Error('Forbidden');
+    }
+
+    const limit = Number(limitBytes);
+    if (!Number.isFinite(limit) || limit < 0) {
+      throw new Error('limit_bytes must be a non-negative number');
+    }
+
+    const oldLimit = targetUser.f.storage_limit_bytes;
+    targetUser.f.storage_limit_bytes = limit;
+    await targetUser.save();
+
+    await AuditLogModel.log(actor.id, target.id, 'storage_limit_changed', { from: oldLimit, to: limit });
+
+    const [withUsage] = await UserManagementService.__withStorageUsage([targetUser]);
+    return withUsage;
   }
 
   /**

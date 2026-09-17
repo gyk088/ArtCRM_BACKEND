@@ -46,6 +46,10 @@ export default class CollectionModel extends PgObject {
       imported: {
         default: false
       },
+      // Группировка ссылок по папкам (как в файловом менеджере) + ручной
+      // порядок внутри папки/корня для drag&drop.
+      folder_id: {},
+      order_num: {},
       // Показ цен работ в ссылке в другой валюте, чем они заведены у
       // художника (например, работы в RUB, а ссылка — в EUR).
       // display_currency = null означает "без переопределения" — цены
@@ -118,7 +122,7 @@ export default class CollectionModel extends PgObject {
       FROM my_collection c
       LEFT JOIN my_file f ON c.avatar_id = f.id
       WHERE c.user_id = $1
-      ORDER BY c.ctime DESC
+      ORDER BY c.order_num ASC NULLS FIRST, c.ctime DESC
     `;
     const result = await PgObject.query(query, [userId]);
     return result.rows.map(CollectionModel.__withAvatar);
@@ -142,6 +146,30 @@ export default class CollectionModel extends PgObject {
     const result = await PgObject.query(query, [id]);
     const row = result.rows[0];
     return row ? CollectionModel.__withAvatar(row) : null;
+  }
+
+  /**
+   * Отвязать все ссылки от папки — вызывается при каскадном удалении папки.
+   *
+   * @param {string} folderId
+   * @static
+  */
+  static async clearFolderId(folderId) {
+    await CollectionModel.query('UPDATE my_collection SET folder_id = NULL WHERE folder_id = $1', [folderId]);
+  }
+
+  /**
+   * Проверить, что все переданные id ссылок принадлежат пользователю —
+   * нужно перед пересортировкой (reorder).
+   *
+   * @param {string[]} ids
+   * @param {string} userId
+   * @static
+  */
+  static async getByIdsForUser(ids, userId) {
+    if (!ids.length) return [];
+    const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
+    return CollectionModel.select(`WHERE user_id = $1 AND id IN (${placeholders})`, [userId, ...ids]);
   }
 
   static __withAvatar(row) {

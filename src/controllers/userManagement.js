@@ -79,6 +79,17 @@ export default class UserManagementController {
         }
     }
 
+    static async updateStorageLimit(request, reply) {
+        try {
+            const { id } = request.params;
+            const { limit_bytes } = request.body;
+            const user = await UserManagementService.updateStorageLimit(request.user, id, limit_bytes);
+            return user;
+        } catch (error) {
+            sendError(reply, error);
+        }
+    }
+
     static async impersonate(request, reply) {
         try {
             const { id } = request.params;
