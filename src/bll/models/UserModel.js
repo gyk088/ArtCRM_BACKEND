@@ -50,7 +50,23 @@ export default class UserModel extends PgObject {
       // Админ-панели (см. UserManagementService.updateStorageLimit).
       storage_limit_bytes: {
         default: 5368709120
-      }
+      },
+      // Квоты "проданных мест" — только для role='gallery', управляются из
+      // Админ-панели (см. UserManagementService.updateQuotas). По умолчанию
+      // 0 — у только что созданной галереи ничего не куплено.
+      quota_catalog_artists: {
+        default: 0
+      },
+      quota_artist_cabinets: {
+        default: 0
+      },
+      quota_managers: {
+        default: 0
+      },
+      // Токены персональных пригласительных ссылок регистрации галереи —
+      // отдельно для менеджеров и для художников (см. AuthService.registerViaInvite).
+      manager_invite_token: {},
+      artist_invite_token: {}
     }
   }
 
@@ -73,6 +89,27 @@ export default class UserModel extends PgObject {
   static async getUserByResetToken(token) {
     const users = await UserModel.select("WHERE reset_token = $1 LIMIT 1", [token]);
     return users[0];
+  }
+
+  /**
+   * Найти галерею по токену пригласительной ссылки регистрации — у галереи
+   * их две (для менеджеров и для художников отдельно), роль определяется
+   * тем, в какую из колонок токен попал, вызывающему знать её заранее не нужно.
+   *
+   * @param {string} token
+   * @return {{gallery: object, role: 'manager'|'artist'}|null}
+   * @static
+  */
+  static async getGalleryByInviteToken(token) {
+    const users = await UserModel.select(
+      "WHERE (manager_invite_token = $1 OR artist_invite_token = $1) AND role = 'gallery' LIMIT 1",
+      [token]
+    );
+    const gallery = users[0];
+    if (!gallery) return null;
+
+    const role = gallery.f.manager_invite_token === token ? 'manager' : 'artist';
+    return { gallery, role };
   }
 
   toJSON() {

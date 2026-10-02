@@ -115,6 +115,11 @@ export default class PublicPageController {
                 return reply.code(404).view('collection-not-found.ejs');
             }
 
+            // Не блокируем рендер страницы записью просмотра — это не
+            // критично для ответа посетителю, ошибка логируется и только.
+            CollectionService.recordView(id, request.ip, request.headers['user-agent'])
+                .catch((error) => request.log.error(error));
+
             const works = collection.works || [];
             const artistName = collection.artistOrGallery || '';
             const withAvatar = works.find(w => w.avatar && w.avatar.url);

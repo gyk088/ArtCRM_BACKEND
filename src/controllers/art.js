@@ -5,7 +5,7 @@ export default class ArtController {
 
     static async createArtObject(request, reply) {
         try {
-            const artObject = await ArtService.createArtObject(request.body, request.user.f.id);
+            const artObject = await ArtService.createArtObject(request.body, request.user);
             return artObject;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -15,7 +15,7 @@ export default class ArtController {
     static async getArtObjectById(request, reply) {
         try {
             const { id } = request.params;
-            const artObject = await ArtService.getArtObjectByIdWithAvatar(id, request.user.f.id);
+            const artObject = await ArtService.getArtObjectByIdWithAvatar(id, request.user);
             return artObject;
         } catch (error) {
             reply.code(404).send({ error: error.message });
@@ -25,7 +25,7 @@ export default class ArtController {
     static async getArtObjectWithDetails(request, reply) {
         try {
             const { id } = request.params;
-            const artObject = await ArtService.getArtObjectWithDetails(id, request.user.f.id);
+            const artObject = await ArtService.getArtObjectWithDetails(id, request.user);
             return artObject;
         } catch (error) {
             reply.code(404).send({ error: error.message });
@@ -34,7 +34,7 @@ export default class ArtController {
 
     static async getAllArtObjects(request, reply) {
         try {
-            const artObjects = await ArtService.getAllArtObjects(request.user.f.id);
+            const artObjects = await ArtService.getAllArtObjects(request.user);
             return artObjects;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -62,7 +62,7 @@ export default class ArtController {
 
     static async updateArtObject(request, reply) {
         try {
-            const artObject = await ArtService.updateArtObject(request.body, request.user.f.id);
+            const artObject = await ArtService.updateArtObject(request.body, request.user);
             return artObject;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -73,7 +73,7 @@ export default class ArtController {
         try {
             const { id } = request.params;
             const updates = request.body;
-            const artObject = await ArtService.updateArtObjectPartial(id, updates, request.user.f.id);
+            const artObject = await ArtService.updateArtObjectPartial(id, updates, request.user);
             return artObject;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -83,7 +83,7 @@ export default class ArtController {
     static async deleteArtObject(request, reply) {
         try {
             const { id } = request.params;
-            const result = await ArtService.deleteArtObject(id, request.user.f.id);
+            const result = await ArtService.deleteArtObject(id, request.user);
             return result;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -328,7 +328,7 @@ export default class ArtController {
 
     static async createArtist(request, reply) {
         try {
-            const artist = await ArtService.createArtist(request.body, request.user.f.id);
+            const artist = await ArtService.createArtist(request.body, request.user);
             return artist;
         } catch (error) {
             reply.code(400).send({ error: error.message });

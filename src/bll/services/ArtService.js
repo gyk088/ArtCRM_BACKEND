@@ -10,7 +10,15 @@ import ArtImageModel from '../models/ArtImageModel.js';
 import ArtLinkModel from '../models/ArtLinkModel.js';
 import CollectionWorkModel from '../models/CollectionWorkModel.js';
 import ExhibitionWorkModel from '../models/ExhibitionWorkModel.js';
+import ContactWorkModel from '../models/ContactWorkModel.js';
+import UserModel from '../models/UserModel.js';
+import AuthorizationService from './AuthorizationService.js';
+import QuotaService from './QuotaService.js';
 import { PgObject } from 'pgobject';
+
+function toPerson(user) {
+    return { id: user.f.id, role: user.f.role, managed_by_gallery_id: user.f.managed_by_gallery_id };
+}
 
 export default class ArtService {
     // ============= ART OBJECT METHODS =============
@@ -20,11 +28,42 @@ export default class ArtService {
         return images.map(img => (typeof img === 'string' ? img : img.id));
     }
 
-    static async createArtObject(artData, userId) {
+    /**
+     * Проверить, что actorUser имеет доступ к работе (свою — всегда; чужую —
+     * только в рамках общей галереи, см. AuthorizationService). Бросает
+     * ошибку "не найдено" вместо "нет доступа" — как и везде в проекте,
+     * чтобы не подтверждать посторонним само существование записи.
+     *
+     * @param {object} actorUser - request.user
+     * @param {object} artObject - PgObject (.f.user_id) либо resolved-объект (.user_id)
+     * @param {object} [options]
+     * @param {boolean} [options.forDelete] - более строгая проверка для удаления
+     * @static
+    */
+    static async __assertCanAccessWork(actorUser, artObject, { forDelete = false } = {}) {
+        if (!artObject) throw new Error('Art object not found');
+
+        const ownerId = artObject.f ? artObject.f.user_id : artObject.user_id;
+        const actor = toPerson(actorUser);
+        if (ownerId === actor.id) return;
+
+        const ownerUser = await UserModel.getUserById(ownerId);
+        if (!ownerUser) throw new Error('Art object not found');
+
+        const owner = toPerson(ownerUser);
+        const allowed = forDelete
+            ? AuthorizationService.canDeleteWorkOwner(actor, owner)
+            : AuthorizationService.canAccessWorkOwner(actor, owner);
+
+        if (!allowed) throw new Error('Art object not found');
+    }
+
+    static async createArtObject(artData, actorUser) {
         const { images, ...artFields } = artData;
         const artObject = new MyArtObject({
             ...artFields,
-            user_id: userId,
+            user_id: actorUser.f.id,
+            updated_by: actorUser.f.id,
             ctime: new Date(),
             utime: new Date()
         });
@@ -35,37 +74,36 @@ export default class ArtService {
             await ArtImageModel.setImagesForArt(artObject.f.id, this.__extractImageFileIds(images));
         }
 
-        return artObject;
+        return MyArtObject.getByIdWithAvatar(artObject.f.id);
     }
 
-    static async getArtObjectById(id, userId) {
+    static async getArtObjectById(id, actorUser) {
         const artObject = await MyArtObject.getById(id);
-        if (!artObject || artObject.f.user_id !== userId) {
-            throw new Error('Art object not found');
-        }
+        await ArtService.__assertCanAccessWork(actorUser, artObject);
         return artObject;
     }
 
-    static async getArtObjectWithDetails(id, userId) {
+    static async getArtObjectWithDetails(id, actorUser) {
         const artObject = await MyArtObject.getWithDetails(id);
-        if (!artObject || artObject.f.user_id !== userId) {
-            throw new Error('Art object not found');
-        }
+        await ArtService.__assertCanAccessWork(actorUser, artObject);
         return artObject;
     }
 
-    static async getArtObjectByIdWithAvatar(id, userId) {
+    static async getArtObjectByIdWithAvatar(id, actorUser) {
         const artObject = await MyArtObject.getByIdWithAvatar(id);
-        if (!artObject || artObject.user_id !== userId) {
-            throw new Error('Art object not found');
-        }
+        await ArtService.__assertCanAccessWork(actorUser, artObject);
         artObject.images = await ArtImageModel.getResolvedImagesForArt(id);
         return artObject;
     }
 
-    static async getAllArtObjects(userId) {
-        const artObjects = await MyArtObject.getAllWithAvatar(userId);
-        return artObjects;
+    /**
+     * Все работы, видимые пользователю: свои + (для Gallery и её
+     * Manager'ов) все работы галереи — см. AuthorizationService.
+     * gallerySharingScope и MyArtObject.getAllWithAvatar.
+     */
+    static async getAllArtObjects(actorUser) {
+        const scope = AuthorizationService.gallerySharingScope(toPerson(actorUser));
+        return MyArtObject.getAllWithAvatar(actorUser.f.id, scope);
     }
 
     static async getArtObjectsByUserId(userId) {
@@ -78,11 +116,9 @@ export default class ArtService {
         return artObjects;
     }
 
-    static async updateArtObject(artData, userId) {
+    static async updateArtObject(artData, actorUser) {
         const artObject = await MyArtObject.getById(artData.id);
-        if (!artObject || artObject.f.user_id !== userId) {
-            throw new Error('Art object not found');
-        }
+        await ArtService.__assertCanAccessWork(actorUser, artObject);
 
         // Обновляем только переданные поля
         artObject.f.name = artData.name !== undefined ? artData.name : artObject.f.name;
@@ -97,6 +133,7 @@ export default class ArtService {
         artObject.f.price = artData.price !== undefined ? artData.price : artObject.f.price;
         artObject.f.currency = artData.currency !== undefined ? artData.currency : artObject.f.currency;
         artObject.f.year = artData.year !== undefined ? artData.year : artObject.f.year;
+        artObject.f.updated_by = actorUser.f.id;
         artObject.f.utime = new Date();
 
         await artObject.save();
@@ -105,14 +142,12 @@ export default class ArtService {
             await ArtImageModel.setImagesForArt(artObject.f.id, this.__extractImageFileIds(artData.images));
         }
 
-        return artObject;
+        return MyArtObject.getByIdWithAvatar(artObject.f.id);
     }
 
-    static async deleteArtObject(id, userId) {
+    static async deleteArtObject(id, actorUser) {
         const artObject = await MyArtObject.getById(id);
-        if (!artObject || artObject.f.user_id !== userId) {
-            throw new Error('Art object not found');
-        }
+        await ArtService.__assertCanAccessWork(actorUser, artObject, { forDelete: true });
 
         // Сначала удаляем все связи с пользователями
         const users = await MyArtObjectUser.getUsersForArt(id);
@@ -129,6 +164,9 @@ export default class ArtService {
         // Удаляем работу из всех ссылок (my_collection_work) и выставок (my_exhibition_work)
         await CollectionWorkModel.removeArtFromAllCollections(id);
         await ExhibitionWorkModel.removeArtFromAllExhibitions(id);
+
+        // Отвязываем работу от контактов (my_contact_work — "куплено"/"интересуется")
+        await ContactWorkModel.removeArtFromAllContacts(id);
 
         // Затем удаляем сам объект
         await artObject.delete();
@@ -253,10 +291,18 @@ export default class ArtService {
 
     // ============= ARTIST METHODS =============
 
-    static async createArtist(artistData, userId) {
+    static async createArtist(artistData, actorUser) {
+        // Пул справочника художников — общий на галерею (см. QuotaService),
+        // но только если actor вообще внутри такого пула (gallery/manager);
+        // у обычного пользователя без галереи квоты нет — не ограничиваем.
+        const poolGalleryId = QuotaService.poolGalleryId(toPerson(actorUser));
+        if (poolGalleryId) {
+            await QuotaService.assertCanAddCatalogArtist(poolGalleryId);
+        }
+
         const artist = new MyArtist({
             ...artistData,
-            user_id: userId
+            user_id: actorUser.f.id
         });
 
         await artist.save();
@@ -548,25 +594,25 @@ export default class ArtService {
         return createdObjects;
     }
 
-    static async updateArtObjectPartial(id, updates, userId) {
+    static async updateArtObjectPartial(id, updates, actorUser) {
         const artObject = await MyArtObject.getById(id);
-        if (!artObject || artObject.f.user_id !== userId) {
-            throw new Error('Art object not found');
-        }
+        await ArtService.__assertCanAccessWork(actorUser, artObject);
 
         // Обновляем только те поля, которые есть в схеме
         // (artObject.f — Proxy поверх схемы, hasOwnProperty через него не работает,
-        // поэтому проверяем на самой схеме класса)
+        // поэтому проверяем на самой схеме класса). user_id/updated_by —
+        // служебные, задаются сервером, а не клиентом.
         Object.keys(updates).forEach(key => {
-            if (key === 'id' || key === 'user_id') return;
+            if (key === 'id' || key === 'user_id' || key === 'updated_by') return;
             if (Object.prototype.hasOwnProperty.call(MyArtObject.schema, key)) {
                 artObject.f[key] = updates[key];
             }
         });
-        
+
+        artObject.f.updated_by = actorUser.f.id;
         artObject.f.utime = new Date();
         await artObject.save();
-        
-        return artObject;
+
+        return MyArtObject.getByIdWithAvatar(id);
     }
 }

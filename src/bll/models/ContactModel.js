@@ -12,6 +12,17 @@ export default class ContactModel extends PgObject {
       name: {},
       phone: {},
       messenger: {},
+      email: {},
+      // Организация/компания, если контакт представляет юрлицо (галерея-
+      // партнёр, музей, аукционный дом и т.п.)
+      company: {},
+      city: {},
+      // Откуда пришёл контакт — ссылка на справочник my_contact_source
+      // (управляется как Медиа/Серия и т.п. — раздел "Справочник")
+      source: {},
+      // Тип контакта — ссылка на справочник my_contact_category, та же логика
+      category: {},
+      birthday: {},
       notes: {},
       ctime: {
         default: new Date()

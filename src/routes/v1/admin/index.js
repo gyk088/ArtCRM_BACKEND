@@ -15,6 +15,10 @@ export default async function adminRoutes(fastify, _options) {
     // Смена роли
     fastify.patch('/users/:id/role', {preHandler: [auth([ROLES.SUPER_ADMIN, ROLES.GALLERY])]}, UserManagementController.changeRole)
 
+    // Перемещение менеджера/художника в другую галерею (или убрать из галереи) —
+    // строго Super Admin, см. UserManagementService.assignUserToGallery.
+    fastify.patch('/users/:id/gallery', {preHandler: [auth([ROLES.SUPER_ADMIN])]}, UserManagementController.assignUserToGallery)
+
     // Блокировка/разблокировка
     fastify.patch('/users/:id/block', {preHandler: [auth([ROLES.SUPER_ADMIN, ROLES.GALLERY])]}, UserManagementController.toggleBlock)
 
@@ -26,6 +30,16 @@ export default async function adminRoutes(fastify, _options) {
 
     // Изменение лимита места на диске (Manager/Artist/Super Admin)
     fastify.patch('/users/:id/storage-limit', {preHandler: [auth([ROLES.SUPER_ADMIN, ROLES.GALLERY])]}, UserManagementController.updateStorageLimit)
+
+    // Квоты "проданных мест" галереи (менеджеры/художники-с-кабинетом/
+    // художники-справочника) — смотреть может сама галерея и Super Admin,
+    // менять (это оплаченный лимит) — только Super Admin
+    fastify.get('/galleries/:id/quotas', {preHandler: [auth([ROLES.SUPER_ADMIN, ROLES.GALLERY])]}, UserManagementController.getQuotaUsage)
+    fastify.patch('/galleries/:id/quotas', {preHandler: [auth([ROLES.SUPER_ADMIN])]}, UserManagementController.updateQuotas)
+
+    // Пригласительные ссылки регистрации галереи — сама галерея и Super Admin
+    fastify.get('/galleries/:id/invites', {preHandler: [auth([ROLES.SUPER_ADMIN, ROLES.GALLERY])]}, UserManagementController.getInviteLinks)
+    fastify.patch('/galleries/:id/invites/regenerate', {preHandler: [auth([ROLES.SUPER_ADMIN, ROLES.GALLERY])]}, UserManagementController.regenerateInviteLink)
 
     // Имперсонация ("зайти под пользователем")
     fastify.post('/users/:id/impersonate', {preHandler: [auth([ROLES.SUPER_ADMIN, ROLES.GALLERY])]}, UserManagementController.impersonate)

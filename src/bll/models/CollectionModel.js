@@ -110,26 +110,36 @@ export default class CollectionModel extends PgObject {
   }
 
   /**
-   * Получить все ссылки пользователя с резолвленной обложкой (avatar)
+   * Получить все ссылки, видимые пользователю — свои + (для Gallery и её
+   * Manager'ов) все ссылки той же галереи, см. AuthorizationService.
+   * gallerySharingScope. gallerySharingScopeId = null — шаринга нет (Artist
+   * или пользователь вне галереи), виден только свой user_id.
    *
    * @param {string} userId - ID пользователя-владельца
+   * @param {string|null} gallerySharingScopeId
    * @return {object[]} collections - объекты с полем avatar: {id, ext, name, url} | null
    * @static
   */
-  static async getAllWithAvatar(userId) {
+  static async getAllWithAvatar(userId, gallerySharingScopeId = null) {
     const query = `
-      SELECT c.*, f.id as f_id, f.ext as f_ext, f.name as f_name
+      SELECT c.*, f.id as f_id, f.ext as f_ext, f.name as f_name,
+        creator.name as creator_name, creator.surname as creator_surname
       FROM my_collection c
       LEFT JOIN my_file f ON c.avatar_id = f.id
+      LEFT JOIN my_user creator ON c.user_id = creator.id
       WHERE c.user_id = $1
+        OR ($2::uuid IS NOT NULL AND (
+          c.user_id = $2
+          OR c.user_id IN (SELECT id FROM my_user WHERE managed_by_gallery_id = $2 AND role = 'manager')
+        ))
       ORDER BY c.order_num ASC NULLS FIRST, c.ctime DESC
     `;
-    const result = await PgObject.query(query, [userId]);
-    return result.rows.map(CollectionModel.__withAvatar);
+    const result = await PgObject.query(query, [userId, gallerySharingScopeId]);
+    return result.rows.map(CollectionModel.__withAvatarAndCreator);
   }
 
   /**
-   * Получить ссылку по ID с резолвленной обложкой (avatar)
+   * Получить ссылку по ID с резолвленной обложкой (avatar) и автором.
    *
    * @param {string} id - ID ссылки
    * @return {object|null} collection - объект с полем avatar: {id, ext, name, url} | null
@@ -137,15 +147,17 @@ export default class CollectionModel extends PgObject {
   */
   static async getByIdWithAvatar(id) {
     const query = `
-      SELECT c.*, f.id as f_id, f.ext as f_ext, f.name as f_name
+      SELECT c.*, f.id as f_id, f.ext as f_ext, f.name as f_name,
+        creator.name as creator_name, creator.surname as creator_surname
       FROM my_collection c
       LEFT JOIN my_file f ON c.avatar_id = f.id
+      LEFT JOIN my_user creator ON c.user_id = creator.id
       WHERE c.id = $1
       LIMIT 1
     `;
     const result = await PgObject.query(query, [id]);
     const row = result.rows[0];
-    return row ? CollectionModel.__withAvatar(row) : null;
+    return row ? CollectionModel.__withAvatarAndCreator(row) : null;
   }
 
   /**
@@ -177,6 +189,17 @@ export default class CollectionModel extends PgObject {
     return {
       ...rest,
       avatar: f_id ? { id: f_id, ext: f_ext, name: f_name, url: `${getFileBaseUrl()}/${f_id}.${f_ext}` } : null
+    };
+  }
+
+  // Как __withAvatar, плюс имя автора — нужно на общем экране галереи,
+  // где видны ссылки разных менеджеров и важно понимать, чья это ссылка.
+  static __withAvatarAndCreator(row) {
+    const { creator_name, creator_surname, ...rest } = row;
+    const withAvatar = CollectionModel.__withAvatar(rest);
+    return {
+      ...withAvatar,
+      createdBy: { name: creator_name, surname: creator_surname }
     };
   }
 

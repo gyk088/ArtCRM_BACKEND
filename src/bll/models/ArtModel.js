@@ -59,6 +59,10 @@ export default class MyArtObject extends PgObject {
       imported: {
         default: false
       },
+      // Кто последним редактировал работу — сохраняем отдельно от user_id
+      // (это "кто создал"), т.к. в рамках галереи работу могут править и
+      // другие менеджеры/сама галерея (см. AuthorizationService.gallerySharingScope).
+      updated_by: {},
       ctime: {
         default: new Date()
       },
@@ -85,42 +89,65 @@ export default class MyArtObject extends PgObject {
   }
 
   /**
-   * Получить все объекты искусства пользователя с резолвленной обложкой (avatar)
+   * Получить все объекты искусства, видимые пользователю, с резолвленной
+   * обложкой (avatar) и автором/последним редактором.
    *
-   * @param {string} userId - ID пользователя-владельца
-   * @return {object[]} artObjects - объекты с полем avatar: {id, ext, name, url} | null
+   * Помимо своих работ (user_id = userId) включает работы всей галереи,
+   * если у вызывающего есть общая "зона видимости" (gallerySharingScopeId —
+   * id самой галереи для Gallery, либо managed_by_gallery_id для Manager,
+   * см. AuthorizationService.gallerySharingScope): тогда видны работы самой
+   * галереи и всех её менеджеров. Художник — исключение: его работы не
+   * попадают в общую видимость галереи, даже если он formально managed_by
+   * этой же галереи (см. роль = 'manager' в подзапросе ниже).
+   *
+   * @param {string} userId - ID вызывающего пользователя
+   * @param {string|null} gallerySharingScopeId - id зоны видимости галереи или null
+   * @return {object[]} artObjects
    * @static
   */
-  static async getAllWithAvatar(userId) {
+  static async getAllWithAvatar(userId, gallerySharingScopeId = null) {
     const query = `
-      SELECT ao.*, f.id as f_id, f.ext as f_ext, f.name as f_name
+      SELECT ao.*, f.id as f_id, f.ext as f_ext, f.name as f_name,
+        creator.name as creator_name, creator.surname as creator_surname,
+        editor.name as editor_name, editor.surname as editor_surname
       FROM my_art_object ao
       LEFT JOIN my_file f ON ao.avatar_id = f.id
+      LEFT JOIN my_user creator ON ao.user_id = creator.id
+      LEFT JOIN my_user editor ON ao.updated_by = editor.id
       WHERE ao.user_id = $1
+        OR ($2::uuid IS NOT NULL AND (
+          ao.user_id = $2
+          OR ao.user_id IN (SELECT id FROM my_user WHERE managed_by_gallery_id = $2 AND role = 'manager')
+        ))
       ORDER BY ao.ctime DESC
     `;
-    const result = await PgObject.query(query, [userId]);
-    return result.rows.map(MyArtObject.__withAvatar);
+    const result = await PgObject.query(query, [userId, gallerySharingScopeId]);
+    return result.rows.map(MyArtObject.__withAvatarAndAuthors);
   }
 
   /**
-   * Получить объект искусства по ID с резолвленной обложкой (avatar)
+   * Получить объект искусства по ID с резолвленной обложкой (avatar) и
+   * автором/последним редактором.
    *
    * @param {string} id - ID объекта
-   * @return {object|null} artObject - объект с полем avatar: {id, ext, name, url} | null
+   * @return {object|null} artObject
    * @static
   */
   static async getByIdWithAvatar(id) {
     const query = `
-      SELECT ao.*, f.id as f_id, f.ext as f_ext, f.name as f_name
+      SELECT ao.*, f.id as f_id, f.ext as f_ext, f.name as f_name,
+        creator.name as creator_name, creator.surname as creator_surname,
+        editor.name as editor_name, editor.surname as editor_surname
       FROM my_art_object ao
       LEFT JOIN my_file f ON ao.avatar_id = f.id
+      LEFT JOIN my_user creator ON ao.user_id = creator.id
+      LEFT JOIN my_user editor ON ao.updated_by = editor.id
       WHERE ao.id = $1
       LIMIT 1
     `;
     const result = await PgObject.query(query, [id]);
     const row = result.rows[0];
-    return row ? MyArtObject.__withAvatar(row) : null;
+    return row ? MyArtObject.__withAvatarAndAuthors(row) : null;
   }
 
   static __withAvatar(row) {
@@ -128,6 +155,20 @@ export default class MyArtObject extends PgObject {
     return {
       ...rest,
       avatar: f_id ? { id: f_id, ext: f_ext, name: f_name, url: `${getFileBaseUrl()}/${f_id}.${f_ext}` } : null
+    };
+  }
+
+  static __withAvatarAndAuthors(row) {
+    const { creator_name, creator_surname, editor_name, editor_surname, ...rest } = row;
+    const withAvatar = MyArtObject.__withAvatar(rest);
+    return {
+      ...withAvatar,
+      createdBy: withAvatar.user_id
+        ? { id: withAvatar.user_id, name: creator_name, surname: creator_surname }
+        : null,
+      updatedBy: withAvatar.updated_by
+        ? { id: withAvatar.updated_by, name: editor_name, surname: editor_surname }
+        : null,
     };
   }
 

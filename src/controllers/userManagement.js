@@ -46,6 +46,17 @@ export default class UserManagementController {
         }
     }
 
+    static async assignUserToGallery(request, reply) {
+        try {
+            const { id } = request.params;
+            const { galleryId } = request.body;
+            const user = await UserManagementService.assignUserToGallery(request.user, id, galleryId);
+            return user;
+        } catch (error) {
+            sendError(reply, error);
+        }
+    }
+
     static async toggleBlock(request, reply) {
         try {
             const { id } = request.params;
@@ -85,6 +96,47 @@ export default class UserManagementController {
             const { limit_bytes } = request.body;
             const user = await UserManagementService.updateStorageLimit(request.user, id, limit_bytes);
             return user;
+        } catch (error) {
+            sendError(reply, error);
+        }
+    }
+
+    static async getQuotaUsage(request, reply) {
+        try {
+            const { id } = request.params;
+            const result = await UserManagementService.getQuotaUsage(request.user, id);
+            return result;
+        } catch (error) {
+            sendError(reply, error);
+        }
+    }
+
+    static async updateQuotas(request, reply) {
+        try {
+            const { id } = request.params;
+            const result = await UserManagementService.updateQuotas(request.user, id, request.body);
+            return result;
+        } catch (error) {
+            sendError(reply, error);
+        }
+    }
+
+    static async getInviteLinks(request, reply) {
+        try {
+            const { id } = request.params;
+            const result = await UserManagementService.getInviteLinks(request.user, id);
+            return result;
+        } catch (error) {
+            sendError(reply, error);
+        }
+    }
+
+    static async regenerateInviteLink(request, reply) {
+        try {
+            const { id } = request.params;
+            const { role } = request.body;
+            const result = await UserManagementService.regenerateInviteLink(request.user, id, role);
+            return result;
         } catch (error) {
             sendError(reply, error);
         }

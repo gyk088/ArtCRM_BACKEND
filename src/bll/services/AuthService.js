@@ -1,5 +1,6 @@
 import UserModel from '../models/UserModel.js'
 import SessionModel from '../models/SessionModel.js';
+import QuotaService from './QuotaService.js';
 import { getRandomInt, validateEmail } from '../utils/helpers.js'
 import Mailer from '../utils/Mailer.js'
 import bcrypt from 'bcrypt';
@@ -85,6 +86,83 @@ export default class AuthService {
       session,
       user
     }
+  }
+
+  /**
+   * Регистрация по пригласительной ссылке галереи — отдельная для
+   * менеджеров и для художников (роль берётся из того, какой токен
+   * совпал, см. UserModel.getGalleryByInviteToken), а не из userData,
+   * по той же причине, что и в обычной register(). Учитывает купленную
+   * галереей квоту (см. QuotaService) — превышение блокирует регистрацию.
+   *
+   * @param {string} inviteToken
+   * @param {object} userData - {name, surname, email, password}
+   * @param {string} ip
+   * @param {string} user_agent
+   * @return { User, Session } user, session
+   * @static
+  */
+  static async registerViaInvite(inviteToken, userData, ip, user_agent) {
+    if (!inviteToken) throw new Error('invite token is required');
+
+    const email = userData.email?.toLowerCase();
+    if (!email || !validateEmail(email)) throw new Error('email is invalid');
+    if (!userData.password || userData.password.length < 6) throw new Error('password must be at least 6 characters');
+
+    const invite = await UserModel.getGalleryByInviteToken(inviteToken);
+    if (!invite) throw new Error('invite link is invalid');
+
+    const existingUser = await UserModel.getUserByEmail(email);
+    if (existingUser) throw new Error('email is already registered');
+
+    const role = invite.role === 'manager' ? ROLES.MANAGER : ROLES.ARTIST;
+    if (role === ROLES.MANAGER) {
+      await QuotaService.assertCanAddManager(invite.gallery.f.id);
+    } else {
+      await QuotaService.assertCanAddArtistCabinet(invite.gallery.f.id);
+    }
+
+    const user = new UserModel({
+      name: userData.name,
+      surname: userData.surname,
+      email,
+      password: userData.password,
+      role,
+      managed_by_gallery_id: invite.gallery.f.id
+    });
+    await user.save();
+
+    const session = new SessionModel({
+      user_id: user.f.id,
+      ip,
+      user_agent
+    });
+    await session.generateToken();
+    await session.save();
+
+    return {
+      session,
+      user
+    }
+  }
+
+  /**
+   * Предпросмотр пригласительной ссылки до регистрации — чтобы страница
+   * регистрации могла показать "Вы регистрируетесь как Менеджер галереи
+   * X", не спрашивая роль у самого регистрирующегося.
+   *
+   * @param {string} inviteToken
+   * @return {{ role: 'manager'|'artist', galleryName: string }}
+   * @static
+  */
+  static async getInvitePreview(inviteToken) {
+    const invite = await UserModel.getGalleryByInviteToken(inviteToken);
+    if (!invite) throw new Error('invite link is invalid');
+
+    return {
+      role: invite.role,
+      galleryName: [invite.gallery.f.name, invite.gallery.f.surname].filter(Boolean).join(' ') || invite.gallery.f.email,
+    };
   }
 
   /**

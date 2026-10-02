@@ -23,6 +23,25 @@ export default class AuthController {
         }
     }
 
+    static async getInvitePreview(request, reply) {
+        try {
+            const data = await AuthService.getInvitePreview(request.params.token);
+            return data
+        } catch (error) {
+            reply.code(404).send(error)
+        }
+    }
+
+    static async registerViaInvite(request, reply) {
+        try {
+            const { token, ...userData } = request.body;
+            const data = await AuthService.registerViaInvite(token, userData, request.ip, request.headers['user-agent']);
+            return data
+        } catch (error) {
+            reply.code(400).send(error)
+        }
+    }
+
     static async requestPasswordReset(request, reply) {
         try {
             const data = await AuthService.requestPasswordReset(request.body.email);

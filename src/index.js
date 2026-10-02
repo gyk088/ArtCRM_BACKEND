@@ -17,7 +17,7 @@ import fastifyView from '@fastify/view'
 import ejs from 'ejs'
 import cors from '@fastify/cors'  // Добавьте импорт
 import { PgObject } from 'pgobject'
-import { Pool } from 'pg'
+import { Pool, types as pgTypes } from 'pg'
 import dotenv from 'dotenv';
 // Нужно для __dirname в ESM
 import { fileURLToPath } from 'url'
@@ -91,6 +91,14 @@ fastify.addHook('onResponse', async (request, reply) => {
     request.log.error(e, 'Failed to write impersonation audit log')
   }
 })
+
+// DATE (oid 1082) по умолчанию парсится node-postgres в JS Date на полночь
+// ПО ЛОКАЛЬНОМУ времени сервера — при сериализации в JSON (.toISOString())
+// это превращается в UTC и на серверах с положительным смещением (у нас
+// UTC+2) съезжает на день назад (2026-06-15 -> "2026-06-14T22:00:00.000Z").
+// Отдаём дату как есть, строкой 'YYYY-MM-DD' — без часового пояса вообще,
+// что и ожидают все поля-даты в проекте (birthday, start_date, end_date).
+pgTypes.setTypeParser(1082, (value) => value);
 
 function connectToDatabase() {
   console.log('Connecting to database...', process.env.DB_USER);
