@@ -42,7 +42,7 @@ export default class LinkController {
 
     static async getLinksByUserId(request, reply) {
         try {
-            const links = await LinkService.getLinksByUserId(request.user.f.id);
+            const links = await LinkService.getLinksByUserId(request.params.userId, request.user);
             return links;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -100,7 +100,7 @@ export default class LinkController {
 
     static async getUserLinksWithStats(request, reply) {
         try {
-            const links = await LinkService.getUserLinksWithStats(request.user.f.id);
+            const links = await LinkService.getUserLinksWithStats(request.params.userId, request.user);
             return links;
         } catch (error) {
             reply.code(400).send({ error: error.message });

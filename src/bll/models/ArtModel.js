@@ -1,5 +1,5 @@
 import { PgObject } from 'pgobject';
-import { getFileBaseUrl } from '../utils/const.js';
+import { getFileBaseUrl, CURRENCIES } from '../utils/const.js';
 
 export default class MyArtObject extends PgObject {
   static get schema() {
@@ -41,9 +41,8 @@ export default class MyArtObject extends PgObject {
       currency: {
         default: 'RUB',
         set(currency) {
-          const allowed = ['RUB', 'BYN', 'USD', 'EUR'];
-          if (currency && !allowed.includes(currency)) {
-            throw new Error(`Invalid currency: must be one of ${allowed.join(', ')}`);
+          if (currency && !CURRENCIES.includes(currency)) {
+            throw new Error(`Invalid currency: must be one of ${CURRENCIES.join(', ')}`);
           }
           return currency;
         }
@@ -109,9 +108,12 @@ export default class MyArtObject extends PgObject {
     const query = `
       SELECT ao.*, f.id as f_id, f.ext as f_ext, f.name as f_name,
         creator.name as creator_name, creator.surname as creator_surname,
-        editor.name as editor_name, editor.surname as editor_surname
+        editor.name as editor_name, editor.surname as editor_surname,
+        sale.id as sale_id, sale.sale_date as sale_date,
+        sale.sale_price as sale_price, sale.currency as sale_currency
       FROM my_art_object ao
       LEFT JOIN my_file f ON ao.avatar_id = f.id
+      LEFT JOIN my_sale sale ON sale.art_id = ao.id
       LEFT JOIN my_user creator ON ao.user_id = creator.id
       LEFT JOIN my_user editor ON ao.updated_by = editor.id
       WHERE ao.user_id = $1
@@ -122,6 +124,80 @@ export default class MyArtObject extends PgObject {
       ORDER BY ao.ctime DESC
     `;
     const result = await PgObject.query(query, [userId, gallerySharingScopeId]);
+    return result.rows.map(MyArtObject.__withAvatarAndAuthors);
+  }
+
+  /**
+   * Фильтрация работ, видимых пользователю (та же зона видимости, что и в
+   * getAllWithAvatar). Все фильтры необязательные и комбинируются через AND.
+   * Имена колонок берутся только из белого списка ниже, значения всегда
+   * идут параметрами запроса.
+   *
+   * Поддерживаемые query-параметры:
+   *   media, seria, status, location, artist, currency — точное совпадение
+   *   year, year_from, year_to, price_min, price_max   — числа/диапазоны
+   *   name        — подстрока в названии (без учёта регистра)
+   *   imported    — 'true' / 'false'
+   *   sold        — 'true' (проданные) / 'false' (в наличии)
+   *
+   * @param {object} filters - request.query
+   * @param {string} userId - ID вызывающего пользователя
+   * @param {string|null} gallerySharingScopeId - см. getAllWithAvatar
+   * @return {object[]} artObjects
+   * @static
+  */
+  static async getByFilters(filters, userId, gallerySharingScopeId = null) {
+    const params = [userId, gallerySharingScopeId];
+    const conditions = [];
+    const addParam = (value) => {
+      params.push(value);
+      return `$${params.length}`;
+    };
+    const toNumber = (key) => {
+      const value = Number(filters[key]);
+      if (!Number.isFinite(value)) throw new Error(`Invalid filter value: ${key}`);
+      return value;
+    };
+    const has = (key) => filters[key] !== undefined && filters[key] !== '';
+
+    for (const column of ['media', 'seria', 'status', 'location', 'artist', 'currency']) {
+      if (has(column)) conditions.push(`ao.${column} = ${addParam(String(filters[column]))}`);
+    }
+    if (has('year')) conditions.push(`ao.year = ${addParam(toNumber('year'))}`);
+    if (has('year_from')) conditions.push(`ao.year >= ${addParam(toNumber('year_from'))}`);
+    if (has('year_to')) conditions.push(`ao.year <= ${addParam(toNumber('year_to'))}`);
+    if (has('price_min')) conditions.push(`ao.price >= ${addParam(toNumber('price_min'))}`);
+    if (has('price_max')) conditions.push(`ao.price <= ${addParam(toNumber('price_max'))}`);
+    if (has('name')) conditions.push(`ao.name ILIKE ${addParam(`%${String(filters.name)}%`)}`);
+    if (has('sold')) {
+      if (!['true', 'false'].includes(String(filters.sold))) throw new Error('Invalid filter value: sold');
+      conditions.push(String(filters.sold) === 'true' ? 'sale.id IS NOT NULL' : 'sale.id IS NULL');
+    }
+    if (has('imported')) {
+      if (!['true', 'false'].includes(String(filters.imported))) throw new Error('Invalid filter value: imported');
+      conditions.push(`ao.imported = ${addParam(String(filters.imported) === 'true')}`);
+    }
+
+    const query = `
+      SELECT ao.*, f.id as f_id, f.ext as f_ext, f.name as f_name,
+        creator.name as creator_name, creator.surname as creator_surname,
+        editor.name as editor_name, editor.surname as editor_surname,
+        sale.id as sale_id, sale.sale_date as sale_date,
+        sale.sale_price as sale_price, sale.currency as sale_currency
+      FROM my_art_object ao
+      LEFT JOIN my_file f ON ao.avatar_id = f.id
+      LEFT JOIN my_sale sale ON sale.art_id = ao.id
+      LEFT JOIN my_user creator ON ao.user_id = creator.id
+      LEFT JOIN my_user editor ON ao.updated_by = editor.id
+      WHERE (ao.user_id = $1
+        OR ($2::uuid IS NOT NULL AND (
+          ao.user_id = $2
+          OR ao.user_id IN (SELECT id FROM my_user WHERE managed_by_gallery_id = $2 AND role = 'manager')
+        )))
+        ${conditions.map(c => `AND ${c}`).join('\n        ')}
+      ORDER BY ao.ctime DESC
+    `;
+    const result = await PgObject.query(query, params);
     return result.rows.map(MyArtObject.__withAvatarAndAuthors);
   }
 
@@ -137,9 +213,12 @@ export default class MyArtObject extends PgObject {
     const query = `
       SELECT ao.*, f.id as f_id, f.ext as f_ext, f.name as f_name,
         creator.name as creator_name, creator.surname as creator_surname,
-        editor.name as editor_name, editor.surname as editor_surname
+        editor.name as editor_name, editor.surname as editor_surname,
+        sale.id as sale_id, sale.sale_date as sale_date,
+        sale.sale_price as sale_price, sale.currency as sale_currency
       FROM my_art_object ao
       LEFT JOIN my_file f ON ao.avatar_id = f.id
+      LEFT JOIN my_sale sale ON sale.art_id = ao.id
       LEFT JOIN my_user creator ON ao.user_id = creator.id
       LEFT JOIN my_user editor ON ao.updated_by = editor.id
       WHERE ao.id = $1
@@ -159,10 +238,19 @@ export default class MyArtObject extends PgObject {
   }
 
   static __withAvatarAndAuthors(row) {
-    const { creator_name, creator_surname, editor_name, editor_surname, ...rest } = row;
+    const {
+      creator_name, creator_surname, editor_name, editor_surname,
+      sale_id, sale_date, sale_price, sale_currency,
+      ...rest
+    } = row;
     const withAvatar = MyArtObject.__withAvatar(rest);
     return {
       ...withAvatar,
+      // Краткая информация о продаже (my_sale) — null, если работа не продана.
+      // Полная запись — GET /api/v1/sales/art/:artId.
+      sale: sale_id
+        ? { id: sale_id, sale_date, sale_price: sale_price === null ? null : Number(sale_price), currency: sale_currency }
+        : null,
       createdBy: withAvatar.user_id
         ? { id: withAvatar.user_id, name: creator_name, surname: creator_surname }
         : null,
@@ -204,8 +292,9 @@ export default class MyArtObject extends PgObject {
       GROUP BY ao.id
       LIMIT 1
     `;
-    const objects = await PgObject.query(query, [id]);
-    return objects[0];
+    // без класса-модели PgObject.query возвращает сырой pg-результат
+    const result = await PgObject.query(query, [id]);
+    return result.rows[0];
   }
 
   async update() {

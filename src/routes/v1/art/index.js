@@ -64,4 +64,5 @@ export default async function artRoutes(fastify, _options) {
     
     // Bulk operations
     fastify.post('/art-objects/bulk', {preHandler: [auth()]}, ArtController.bulkCreateArtObjects);
+    fastify.post('/art-objects/bulk-delete', {preHandler: [auth()]}, ArtController.bulkDeleteArtObjects);
 }

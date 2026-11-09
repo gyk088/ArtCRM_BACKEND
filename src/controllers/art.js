@@ -43,7 +43,7 @@ export default class ArtController {
 
     static async getArtObjectsByUserId(request, reply) {
         try {
-            const artObjects = await ArtService.getArtObjectsByUserId(request.user.f.id);
+            const artObjects = await ArtService.getArtObjectsByUserId(request.params.userId, request.user);
             return artObjects;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -53,7 +53,7 @@ export default class ArtController {
     static async getArtObjectsByFilters(request, reply) {
         try {
             const filters = request.query;
-            const artObjects = await ArtService.getArtObjectsByFilters(filters);
+            const artObjects = await ArtService.getArtObjectsByFilters(filters, request.user);
             return artObjects;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -123,7 +123,7 @@ export default class ArtController {
 
     static async getMediaByUserId(request, reply) {
         try {
-            const mediaList = await ArtService.getMediaByUserId(request.user.f.id);
+            const mediaList = await ArtService.getMediaByUserId(request.params.userId, request.user);
             return mediaList;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -181,7 +181,7 @@ export default class ArtController {
 
     static async getSeriaByUserId(request, reply) {
         try {
-            const seriaList = await ArtService.getSeriaByUserId(request.user.f.id);
+            const seriaList = await ArtService.getSeriaByUserId(request.params.userId, request.user);
             return seriaList;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -240,7 +240,7 @@ export default class ArtController {
 
     static async getStatusByUserId(request, reply) {
         try {
-            const statusList = await ArtService.getStatusByUserId(request.user.f.id);
+            const statusList = await ArtService.getStatusByUserId(request.params.userId, request.user);
             return statusList;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -298,7 +298,7 @@ export default class ArtController {
 
     static async getLocationByUserId(request, reply) {
         try {
-            const locationList = await ArtService.getLocationByUserId(request.user.f.id);
+            const locationList = await ArtService.getLocationByUserId(request.params.userId, request.user);
             return locationList;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -356,7 +356,7 @@ export default class ArtController {
 
     static async getArtistByUserId(request, reply) {
         try {
-            const artistList = await ArtService.getArtistByUserId(request.user.f.id);
+            const artistList = await ArtService.getArtistByUserId(request.params.userId, request.user);
             return artistList;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -416,7 +416,7 @@ export default class ArtController {
 
     static async getArtObjectsByUserIdForRelation(request, reply) {
         try {
-            const artObjects = await ArtService.getArtObjectsByUserIdForRelation(request.user.f.id);
+            const artObjects = await ArtService.getArtObjectsByUserIdForRelation(request.params.userId, request.user);
             return artObjects;
         } catch (error) {
             reply.code(400).send({ error: error.message });
@@ -458,6 +458,19 @@ export default class ArtController {
         }
     }
 
+    static async bulkDeleteArtObjects(request, reply) {
+        try {
+            const { ids } = request.body || {};
+            if (!Array.isArray(ids) || !ids.length) {
+                reply.code(400).send({ error: 'ids array is required' });
+                return;
+            }
+            return await ArtService.bulkDeleteArtObjects(ids, request.user);
+        } catch (error) {
+            reply.code(400).send({ error: error.message });
+        }
+    }
+
     static async bulkCreateArtObjects(request, reply) {
         try {
             const { artObjects } = request.body;
@@ -465,7 +478,7 @@ export default class ArtController {
                 reply.code(400).send({ error: 'artObjects array is required' });
                 return;
             }
-            const createdObjects = await ArtService.bulkCreateArtObjects(artObjects, request.user.f.id);
+            const createdObjects = await ArtService.bulkCreateArtObjects(artObjects, request.user);
             return { created: createdObjects.length, objects: createdObjects };
         } catch (error) {
             reply.code(400).send({ error: error.message });

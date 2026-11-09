@@ -9,6 +9,10 @@ import exhibitionRoutes from './routes/v1/exhibition/index.js'
 import contactRoutes from './routes/v1/contact/index.js'
 import adminRoutes from './routes/v1/admin/index.js'
 import publicPageRoutes from './routes/public/index.js'
+import textDocumentRoutes from './routes/v1/textDocument/index.js'
+import saleRoutes from './routes/v1/sale/index.js'
+import reportRoutes from './routes/v1/report/index.js'
+import { BiographyService, CvService } from './bll/services/TextDocumentService.js'
 import AuditLogModel from './bll/models/AuditLogModel.js'
 
 import fastifyMultipart from '@fastify/multipart'
@@ -72,6 +76,10 @@ fastify.register(collectionRoutes, { prefix: '/api/v1/collections' })
 fastify.register(exhibitionRoutes, { prefix: '/api/v1/exhibitions' })
 fastify.register(contactRoutes, { prefix: '/api/v1/contacts' })
 fastify.register(adminRoutes, { prefix: '/api/v1/admin' })
+fastify.register(textDocumentRoutes, { prefix: '/api/v1/bio', service: BiographyService })
+fastify.register(textDocumentRoutes, { prefix: '/api/v1/cv', service: CvService })
+fastify.register(saleRoutes, { prefix: '/api/v1/sales' })
+fastify.register(reportRoutes, { prefix: '/api/v1/reports' })
 fastify.register(publicPageRoutes)
 
 // Аудит-лог всех мутирующих запросов, сделанных во время имперсонации —

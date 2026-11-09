@@ -12,13 +12,11 @@ import CollectionWorkModel from '../models/CollectionWorkModel.js';
 import ExhibitionWorkModel from '../models/ExhibitionWorkModel.js';
 import ContactWorkModel from '../models/ContactWorkModel.js';
 import UserModel from '../models/UserModel.js';
+import SaleModel from '../models/SaleModel.js';
 import AuthorizationService from './AuthorizationService.js';
 import QuotaService from './QuotaService.js';
 import { PgObject } from 'pgobject';
-
-function toPerson(user) {
-    return { id: user.f.id, role: user.f.role, managed_by_gallery_id: user.f.managed_by_gallery_id };
-}
+import { assertCanViewUserData, toPerson } from '../utils/userAccess.js';
 
 export default class ArtService {
     // ============= ART OBJECT METHODS =============
@@ -106,14 +104,24 @@ export default class ArtService {
         return MyArtObject.getAllWithAvatar(actorUser.f.id, scope);
     }
 
-    static async getArtObjectsByUserId(userId) {
+    /**
+     * Работы конкретного пользователя (роут /art-objects/user/:userId).
+     * Чужие — только если actor видит работы этого пользователя по правилам
+     * галереи (см. assertCanViewUserData).
+     */
+    static async getArtObjectsByUserId(targetUserId, actorUser) {
+        const userId = await assertCanViewUserData(actorUser, targetUserId);
         const artObjects = await MyArtObject.getByUserId(userId);
         return artObjects;
     }
 
-    static async getArtObjectsByFilters(filters) {
-        const artObjects = await MyArtObject.getByFilters(filters);
-        return artObjects;
+    /**
+     * Фильтрация работ (роут /art-objects/filters). Ищет среди тех же работ,
+     * что видны в общем списке (свои + общие работы галереи).
+     */
+    static async getArtObjectsByFilters(filters, actorUser) {
+        const scope = AuthorizationService.gallerySharingScope(toPerson(actorUser));
+        return MyArtObject.getByFilters(filters || {}, actorUser.f.id, scope);
     }
 
     static async updateArtObject(artData, actorUser) {
@@ -123,6 +131,7 @@ export default class ArtService {
         // Обновляем только переданные поля
         artObject.f.name = artData.name !== undefined ? artData.name : artObject.f.name;
         artObject.f.technique = artData.technique !== undefined ? artData.technique : artObject.f.technique;
+        artObject.f.description = artData.description !== undefined ? artData.description : artObject.f.description;
         artObject.f.media = artData.media !== undefined ? artData.media : artObject.f.media;
         artObject.f.seria = artData.seria !== undefined ? artData.seria : artObject.f.seria;
         artObject.f.status = artData.status !== undefined ? artData.status : artObject.f.status;
@@ -145,9 +154,18 @@ export default class ArtService {
         return MyArtObject.getByIdWithAvatar(artObject.f.id);
     }
 
+    // Проданную работу удалить нельзя — она молча пропала бы из отчётов о
+    // продажах. Сначала нужно отменить продажу (DELETE /api/v1/sales/:id).
+    static async __assertNotSold(artObject) {
+        if (await SaleModel.getByArtId(artObject.f.id)) {
+            throw new Error(`Art object "${artObject.f.name}" is sold: cancel the sale before deleting`);
+        }
+    }
+
     static async deleteArtObject(id, actorUser) {
         const artObject = await MyArtObject.getById(id);
         await ArtService.__assertCanAccessWork(actorUser, artObject, { forDelete: true });
+        await ArtService.__assertNotSold(artObject);
 
         // Сначала удаляем все связи с пользователями
         const users = await MyArtObjectUser.getUsersForArt(id);
@@ -198,7 +216,8 @@ export default class ArtService {
         return mediaList;
     }
 
-    static async getMediaByUserId(userId) {
+    static async getMediaByUserId(targetUserId, actorUser) {
+        const userId = await assertCanViewUserData(actorUser, targetUserId);
         const mediaList = await MyMedia.getByUserId(userId);
         return mediaList;
     }
@@ -256,7 +275,8 @@ export default class ArtService {
         return seriaList;
     }
 
-    static async getSeriaByUserId(userId) {
+    static async getSeriaByUserId(targetUserId, actorUser) {
+        const userId = await assertCanViewUserData(actorUser, targetUserId);
         const seriaList = await MySeria.getByUserId(userId);
         return seriaList;
     }
@@ -322,7 +342,8 @@ export default class ArtService {
         return artistList;
     }
 
-    static async getArtistByUserId(userId) {
+    static async getArtistByUserId(targetUserId, actorUser) {
+        const userId = await assertCanViewUserData(actorUser, targetUserId);
         const artistList = await MyArtist.getByUserId(userId);
         return artistList;
     }
@@ -383,7 +404,8 @@ export default class ArtService {
         return statusList;
     }
 
-    static async getStatusByUserId(userId) {
+    static async getStatusByUserId(targetUserId, actorUser) {
+        const userId = await assertCanViewUserData(actorUser, targetUserId);
         const statusList = await MyStatus.getByUserId(userId);
         return statusList;
     }
@@ -442,7 +464,8 @@ export default class ArtService {
         return locationList;
     }
 
-    static async getLocationByUserId(userId) {
+    static async getLocationByUserId(targetUserId, actorUser) {
+        const userId = await assertCanViewUserData(actorUser, targetUserId);
         const locationList = await MyLocation.getByUserId(userId);
         return locationList;
     }
@@ -517,7 +540,8 @@ export default class ArtService {
         return userIds;
     }
     
-    static async getArtObjectsByUserIdForRelation(userId) {
+    static async getArtObjectsByUserIdForRelation(targetUserId, actorUser) {
+        const userId = await assertCanViewUserData(actorUser, targetUserId);
         const artIds = await MyArtObjectUser.getArtsForUser(userId);
         const artObjects = [];
 
@@ -577,21 +601,55 @@ export default class ArtService {
             WHERE user_id = $1
         `;
         const result = await PgObject.query(query, [userId]);
-        return result[0];
+        return result.rows[0];
     }
 
-    static async bulkCreateArtObjects(artObjectsData, userId) {
-        const createdObjects = [];
-
-        // Используем транзакцию для массового создания
-        await PgObject.createTransaction(async () => {
-            for (const artData of artObjectsData) {
-                const artObject = await this.createArtObject(artData, userId);
-                createdObjects.push(artObject);
+    /**
+     * Массовое создание работ. Сначала валидируем все записи (сеттеры схемы
+     * проверяют цену/год/валюту при создании объекта), и только потом
+     * сохраняем — чтобы ошибка в одной записи не оставила половину созданных.
+     * (PgObject.createTransaction здесь не подходит: с Pool он открывает
+     * транзакцию на случайном соединении и молча проглатывает ошибки.)
+     */
+    static async bulkCreateArtObjects(artObjectsData, actorUser) {
+        artObjectsData.forEach((artData, index) => {
+            if (!artData || typeof artData !== 'object') {
+                throw new Error(`Item ${index}: art object must be an object`);
+            }
+            if (!artData.name) {
+                throw new Error(`Item ${index}: name is required`);
+            }
+            try {
+                const artFields = { ...artData };
+                delete artFields.images;
+                new MyArtObject({ ...artFields, user_id: actorUser.f.id });
+            } catch (e) {
+                throw new Error(`Item ${index}: ${e.message}`);
             }
         });
 
+        const createdObjects = [];
+        for (const artData of artObjectsData) {
+            createdObjects.push(await this.createArtObject(artData, actorUser));
+        }
         return createdObjects;
+    }
+
+    /**
+     * Массовое удаление работ. Права проверяются для всех работ ДО удаления
+     * первой — либо удаляются все, либо (при чужой/несуществующей) ни одной.
+     */
+    static async bulkDeleteArtObjects(ids, actorUser) {
+        const uniqueIds = [...new Set(ids)];
+        for (const id of uniqueIds) {
+            const artObject = await MyArtObject.getById(id);
+            await ArtService.__assertCanAccessWork(actorUser, artObject, { forDelete: true });
+            await ArtService.__assertNotSold(artObject);
+        }
+        for (const id of uniqueIds) {
+            await ArtService.deleteArtObject(id, actorUser);
+        }
+        return { success: true, deleted: uniqueIds.length };
     }
 
     static async updateArtObjectPartial(id, updates, actorUser) {

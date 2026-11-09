@@ -3,6 +3,7 @@ import ArtLinkModel from '../models/ArtLinkModel.js';
 import LinkArtistModel from '../models/LinkArtistModel.js';
 import MyArtObject from '../models/ArtModel.js';
 import MyArtist from '../models/ArtistModel.js';
+import { assertCanViewUserData } from '../utils/userAccess.js';
 
 export default class LinkService {
     // ============= LINK CRUD METHODS =============
@@ -31,7 +32,9 @@ export default class LinkService {
         return links;
     }
 
-    static async getLinksByUserId(userId) {
+    // Роут /links/user/:userId — чужие ссылки только по правилам галереи
+    static async getLinksByUserId(targetUserId, actorUser) {
+        const userId = await assertCanViewUserData(actorUser, targetUserId);
         const links = await LinkModel.getByUserId(userId);
         return links;
     }
@@ -77,7 +80,9 @@ export default class LinkService {
         return link || null;
     }
 
-    static async getUserLinksWithStats(userId) {
+    // Роут /links/users/:userId/links-stats — чужие только по правилам галереи
+    static async getUserLinksWithStats(targetUserId, actorUser) {
+        const userId = await assertCanViewUserData(actorUser, targetUserId);
         const links = await LinkModel.getUserLinksWithArtObjects(userId);
         return links;
     }

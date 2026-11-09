@@ -9,6 +9,9 @@ export const ROLES = {
 // (сам Manager/Artist не входит в их "уровень" управления другими).
 export const MANAGED_ROLES = [ROLES.MANAGER, ROLES.ARTIST]
 
+// Валюты цен работ и продаж (my_art_object.currency, my_sale.currency)
+export const CURRENCIES = ['RUB', 'BYN', 'USD', 'EUR']
+
 // Базовый URL раздачи загруженных файлов (обложки/доп. изображения работ).
 // Читаем process.env лениво, внутри функции, а не в константе на верхнем
 // уровне модуля — в src/index.js роуты (а с ними и модели) импортируются
@@ -20,5 +23,6 @@ export function getFileBaseUrl() {
 
 export default {
     ROLES,
+    CURRENCIES,
     getFileBaseUrl
 }
