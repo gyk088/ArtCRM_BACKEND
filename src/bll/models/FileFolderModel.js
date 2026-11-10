@@ -1,6 +1,9 @@
 import { PgObject } from 'pgobject';
 import { getFileBaseUrl } from '../utils/const.js';
 
+// Владелец(ы): один id или список (общие папки галереи)
+const toIds = (userId) => (Array.isArray(userId) ? userId : [userId]);
+
 export default class MyFileFolder extends PgObject {
   static get schema() {
     return {
@@ -41,23 +44,23 @@ export default class MyFileFolder extends PgObject {
       SELECT ff.*, f.id as f_id, f.ext as f_ext, f.name as f_name
       FROM my_file_folder ff
       LEFT JOIN my_file f ON ff.avatar_id = f.id
-      WHERE ff.user_id = $1
+      WHERE ff.user_id = ANY($1::uuid[])
       ORDER BY ff.order_num ASC NULLS LAST, ff.ctime ASC
     `;
-    const result = await PgObject.query(query, [userId]);
+    const result = await PgObject.query(query, [toIds(userId)]);
     return result.rows.map(MyFileFolder.__withAvatar);
   }
 
   static async getByParentId(parentId, userId) {
     if (parentId === null || parentId === undefined) {
       return MyFileFolder.select(
-        'WHERE user_id = $1 AND parent_id IS NULL ORDER BY order_num ASC NULLS LAST, ctime ASC',
-        [userId]
+        'WHERE user_id = ANY($1::uuid[]) AND parent_id IS NULL ORDER BY order_num ASC NULLS LAST, ctime ASC',
+        [toIds(userId)]
       );
     }
     return MyFileFolder.select(
-      'WHERE user_id = $1 AND parent_id = $2 ORDER BY order_num ASC NULLS LAST, ctime ASC',
-      [userId, parentId]
+      'WHERE user_id = ANY($1::uuid[]) AND parent_id = $2 ORDER BY order_num ASC NULLS LAST, ctime ASC',
+      [toIds(userId), parentId]
     );
   }
 
@@ -72,7 +75,7 @@ export default class MyFileFolder extends PgObject {
   static async getByIdsForUser(ids, userId) {
     if (!ids.length) return [];
     const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
-    return MyFileFolder.select(`WHERE user_id = $1 AND id IN (${placeholders})`, [userId, ...ids]);
+    return MyFileFolder.select(`WHERE user_id = ANY($1::uuid[]) AND id IN (${placeholders})`, [toIds(userId), ...ids]);
   }
 
   static async getById(id) {
@@ -81,7 +84,7 @@ export default class MyFileFolder extends PgObject {
   }
 
   static async getByIdForUser(id, userId) {
-    const folder = await MyFileFolder.select('WHERE id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
+    const folder = await MyFileFolder.select('WHERE id = $1 AND user_id = ANY($2::uuid[]) LIMIT 1', [id, toIds(userId)]);
     return folder[0];
   }
 

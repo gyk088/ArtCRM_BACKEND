@@ -4,6 +4,7 @@ import fs from 'fs';
 import util from 'util';
 import { pipeline } from 'stream'
 import { fileExt, cutStr } from '../utils/helpers.js';
+import { sharingScopeUserIds } from '../utils/userAccess.js';
 
 const pump = util.promisify(pipeline)
 
@@ -172,8 +173,12 @@ export default class FileService {
   */
   static async deleteFile(id, user) {
     try {
-      // Получаем файл и проверяем права доступа
+      // Получаем файл и проверяем права доступа. Файлы внутри галереи
+      // общие, но удалить файл может только тот, кто его загрузил.
       const file = await this.getFileById(id, user);
+      if (file.f.user_id !== user.f.id) {
+        throw new Error('Only the user who uploaded the file can delete it');
+      }
 
       // Отвязываем файл отовсюду, где он используется — иначе удаление
       // упадёт на внешнем ключе (avatar_id/file_id ссылаются на my_file).
@@ -247,7 +252,7 @@ export default class FileService {
   */
   static async getFileById(id, user) {
     try {
-      const file = await FileModel.getByIdForUser(id, user.f.id);
+      const file = await FileModel.getByIdForUser(id, await sharingScopeUserIds(user));
       if (!file) {
         throw new Error('File not found or access denied');
       }
@@ -315,7 +320,7 @@ export default class FileService {
    * @static
   */
   static async getAllByUserWithPagination(user, page = 1, limit = 10) {
-    return FileModel.getAllByUserWithPagination(user, page, limit);
+    return FileModel.getAllByUserWithPagination(user, page, limit, await sharingScopeUserIds(user));
   }
 
   // ============= FILE FOLDER METHODS =============
@@ -336,7 +341,7 @@ export default class FileService {
   }
 
   static async getFolderById(id, user) {
-    const folder = await FileFolderModel.getByIdForUser(id, user.f.id);
+    const folder = await FileFolderModel.getByIdForUser(id, await sharingScopeUserIds(user));
     if (!folder) {
       throw new Error('Folder not found or access denied');
     }
@@ -344,7 +349,7 @@ export default class FileService {
   }
 
   static async getFoldersByUser(user) {
-    const folders = await FileFolderModel.getByUserId(user.f.id);
+    const folders = await FileFolderModel.getByUserId(await sharingScopeUserIds(user));
     return folders;
   }
 
@@ -373,7 +378,7 @@ export default class FileService {
       if (newParentId) {
         await this.getFolderById(newParentId, user);
 
-        const descendantIds = await this.__getDescendantFolderIds(id, user.f.id);
+        const descendantIds = await this.__getDescendantFolderIds(id, await sharingScopeUserIds(user));
         if (descendantIds.includes(newParentId)) {
           throw new Error('Cannot move folder into its own subfolder');
         }
@@ -398,19 +403,24 @@ export default class FileService {
   }
 
   static async __cascadeDeleteFolder(id, user) {
-    const children = await FileFolderModel.getByParentId(id, user.f.id);
+    // Вложенные папки удаляются вместе с родительской, чьи бы они ни были
+    // (файлы не удаляются — просто переезжают в корень)
+    const children = await FileFolderModel.getByParentId(id, await sharingScopeUserIds(user));
     for (const child of children) {
       await this.__cascadeDeleteFolder(child.f.id, user);
     }
 
     await FileModel.clearFolderId(id);
 
-    const folder = await FileFolderModel.getByIdForUser(id, user.f.id);
+    const folder = await FileFolderModel.getById(id);
     await folder.delete();
   }
 
   static async deleteFolder(id, user) {
-    await this.getFolderById(id, user);
+    const folder = await this.getFolderById(id, user);
+    if (folder.f.user_id !== user.f.id) {
+      throw new Error('Only the user who created the folder can delete it');
+    }
 
     await this.__cascadeDeleteFolder(id, user);
     return { success: true, message: 'Folder deleted successfully', id };
@@ -419,7 +429,7 @@ export default class FileService {
   static async getFilesInFolder(id, user) {
     await this.getFolderById(id, user);
 
-    const files = await FileModel.getByFolderId(id, user.f.id);
+    const files = await FileModel.getByFolderId(id, await sharingScopeUserIds(user));
     return files;
   }
 
@@ -452,7 +462,7 @@ export default class FileService {
    * @static
   */
   static async reorderFiles(ids, user) {
-    const files = await FileModel.getByIdsForUser(ids, user.f.id);
+    const files = await FileModel.getByIdsForUser(ids, await sharingScopeUserIds(user));
     if (files.length !== ids.length) {
       throw new Error('Some files not found or access denied');
     }
@@ -477,7 +487,7 @@ export default class FileService {
    * @static
   */
   static async reorderFolders(ids, user) {
-    const folders = await FileFolderModel.getByIdsForUser(ids, user.f.id);
+    const folders = await FileFolderModel.getByIdsForUser(ids, await sharingScopeUserIds(user));
     if (folders.length !== ids.length) {
       throw new Error('Some folders not found or access denied');
     }

@@ -26,6 +26,8 @@ export default class SaleModel extends PgObject {
       sold_by: {},
       comment: {},
       commission_pct: {},
+      discount_type: {},
+      discount_value: {},
       ctime: {
         default: new Date()
       },

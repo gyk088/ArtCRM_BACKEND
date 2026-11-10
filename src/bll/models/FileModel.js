@@ -1,4 +1,7 @@
-import { PgObject } from 'pgobject'; 
+import { PgObject } from 'pgobject';
+
+// Владелец(ы): один id или список (общие файлы галереи)
+const toIds = (userId) => (Array.isArray(userId) ? userId : [userId]);
 
 export default class FileModel extends PgObject {
     static get schema() {
@@ -43,21 +46,24 @@ export default class FileModel extends PgObject {
      * @return {object} result - объект с файлами и метаинформацией
      * @static
   */
-  static async getAllByUserWithPagination(user, page = 1, limit = 10) {
+  // userIds — id владельцев, чьи файлы видны (сам пользователь или вся
+  // галерея — см. sharingScopeUserIds); по умолчанию только сам user
+  static async getAllByUserWithPagination(user, page = 1, limit = 10, userIds = null) {
       const offset = (page - 1) * limit;
+      const ids = userIds || [user.f.id];
       // order_num — ручной порядок (drag&drop), задаётся только при явной
       // пересортировке; NULLS FIRST — ещё не отсортированные вручную новые
       // файлы всегда показываются раньше уже упорядоченных (как раньше,
       // когда порядок определялся только датой создания).
       const files = await FileModel.select(
-        'WHERE user_id = $1 ORDER BY order_num ASC NULLS FIRST, ctime DESC',
-        [user.f.id]
+        'WHERE user_id = ANY($1::uuid[]) ORDER BY order_num ASC NULLS FIRST, ctime DESC',
+        [ids]
       );
       
       // Получаем общее количество файлов
       const countResult = await FileModel.query(
-        'SELECT COUNT(*) as total FROM my_file WHERE user_id = $1',
-        [user.f.id]
+        'SELECT COUNT(*) as total FROM my_file WHERE user_id = ANY($1::uuid[])',
+        [ids]
       );
        
       const total = parseInt(countResult.rows[0].total, 10);
@@ -84,7 +90,7 @@ export default class FileModel extends PgObject {
   }
 
   static async getByIdForUser(id, userId) {
-      const files = await FileModel.select('WHERE id = $1 AND user_id = $2 LIMIT 1', [id, userId]);
+      const files = await FileModel.select('WHERE id = $1 AND user_id = ANY($2::uuid[]) LIMIT 1', [id, toIds(userId)]);
       return files[0];
   }
 
@@ -104,8 +110,8 @@ export default class FileModel extends PgObject {
 
   static async getByFolderId(folderId, userId) {
       const files = await FileModel.select(
-        'WHERE folder_id = $1 AND user_id = $2 ORDER BY order_num ASC NULLS FIRST, ctime DESC',
-        [folderId, userId]
+        'WHERE folder_id = $1 AND user_id = ANY($2::uuid[]) ORDER BY order_num ASC NULLS FIRST, ctime DESC',
+        [folderId, toIds(userId)]
       );
       return files;
   }
@@ -122,7 +128,7 @@ export default class FileModel extends PgObject {
   static async getByIdsForUser(ids, userId) {
       if (!ids.length) return [];
       const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
-      return FileModel.select(`WHERE user_id = $1 AND id IN (${placeholders})`, [userId, ...ids]);
+      return FileModel.select(`WHERE user_id = ANY($1::uuid[]) AND id IN (${placeholders})`, [toIds(userId), ...ids]);
   }
 
   /**

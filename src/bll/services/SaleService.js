@@ -9,8 +9,22 @@ import { CURRENCIES } from '../utils/const.js';
 const MAX_COMMENT_LENGTH = 2000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+const DISCOUNT_TYPES = ['pct', 'amount'];
+
 function toNumberOrNull(value) {
     return value === null || value === undefined ? null : Number(value);
+}
+
+const round2 = (n) => Math.round(n * 100) / 100;
+
+/**
+ * Цена продажи из цены работы и скидки. Скидка — в процентах ('pct') или
+ * суммой в валюте работы ('amount'); цена не может уйти в минус.
+ */
+export function applyDiscount(basePrice, discountType, discountValue) {
+    const value = discountValue ?? 0;
+    if (discountType === 'pct') return round2(basePrice * (100 - value) / 100);
+    return round2(basePrice - value);
 }
 
 /**
@@ -27,14 +41,16 @@ function toNumberOrNull(value) {
 export default class SaleService {
     /**
      * Наружная форма продажи. numeric из pg приходит строкой — приводим к
-     * числам; скидка не хранится, а считается здесь.
+     * числам. list_price — цена работы на момент продажи (база для скидки);
+     * discount_type/discount_value — как скидку ввели, discount_pct и
+     * discount_amount — она же в процентах и в деньгах.
      */
     static toDto(row) {
         const listPrice = toNumberOrNull(row.list_price);
         const salePrice = toNumberOrNull(row.sale_price);
-        const discountPct = listPrice && listPrice > 0
-            ? Math.round(((listPrice - salePrice) / listPrice) * 10000) / 100
-            : null;
+        const hasBase = listPrice !== null && listPrice > 0;
+        const discountPct = hasBase ? round2(((listPrice - salePrice) / listPrice) * 100) : null;
+        const discountAmount = listPrice !== null ? round2(listPrice - salePrice) : null;
 
         return {
             id: row.id,
@@ -43,14 +59,16 @@ export default class SaleService {
             sale_date: row.sale_date,
             list_price: listPrice,
             sale_price: salePrice,
+            discount_type: row.discount_type ?? null,
+            discount_value: toNumberOrNull(row.discount_value),
             discount_pct: discountPct,
+            discount_amount: discountAmount,
             currency: row.currency,
             contact: row.contact_id ? { id: row.contact_id, name: row.contact_name ?? null } : null,
             sold_by: row.sold_by
                 ? { id: row.sold_by, name: row.sold_by_name ?? null, surname: row.sold_by_surname ?? null }
                 : null,
             comment: row.comment,
-            commission_pct: toNumberOrNull(row.commission_pct),
             ctime: row.ctime,
             utime: row.utime,
         };
@@ -85,22 +103,25 @@ export default class SaleService {
             out.sale_date = date;
         }
 
-        if (!partial || has('sale_price')) {
+        // Либо скидка (цену продажи посчитает сервер от цены работы), либо
+        // сама цена продажи — когда у работы нет цены. Скидка важнее.
+        if (has('discount_type') && data.discount_type !== null && data.discount_type !== '') {
+            if (!DISCOUNT_TYPES.includes(data.discount_type)) {
+                throw new Error('discount_type must be pct or amount');
+            }
+            const raw = data.discount_value;
+            const value = raw === null || raw === undefined || raw === '' ? 0 : Number(raw);
+            if (!Number.isFinite(value) || value < 0) throw new Error('discount_value must be >= 0');
+            if (data.discount_type === 'pct' && value > 100) throw new Error('Discount cannot exceed 100%');
+            out.discount_type = data.discount_type;
+            out.discount_value = round2(value);
+        } else if (!partial || has('sale_price')) {
             const price = Number(data.sale_price);
-            if (data.sale_price === null || data.sale_price === '' || !Number.isFinite(price) || price < 0) {
+            if (data.sale_price === null || data.sale_price === undefined || data.sale_price === ''
+                || !Number.isFinite(price) || price < 0) {
                 throw new Error('sale_price is required and must be >= 0');
             }
-            out.sale_price = price;
-        }
-
-        if (has('list_price')) {
-            if (data.list_price === null || data.list_price === '') {
-                out.list_price = null;
-            } else {
-                const price = Number(data.list_price);
-                if (!Number.isFinite(price) || price < 0) throw new Error('list_price must be >= 0');
-                out.list_price = price;
-            }
+            out.sale_price = round2(price);
         }
 
         if (has('currency')) {
@@ -108,18 +129,6 @@ export default class SaleService {
                 throw new Error(`Invalid currency: must be one of ${CURRENCIES.join(', ')}`);
             }
             out.currency = data.currency;
-        }
-
-        if (has('commission_pct')) {
-            if (data.commission_pct === null || data.commission_pct === '') {
-                out.commission_pct = null;
-            } else {
-                const pct = Number(data.commission_pct);
-                if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
-                    throw new Error('commission_pct must be between 0 and 100');
-                }
-                out.commission_pct = pct;
-            }
         }
 
         if (has('comment')) {
@@ -163,6 +172,27 @@ export default class SaleService {
         } else {
             await new ContactWorkModel({ contact_id: contactId, art_id: artId, status: 'purchased' }).save();
         }
+    }
+
+    /**
+     * Цена продажи и поля скидки для сохранения. Со скидкой цена считается
+     * от цены работы; без скидки берётся введённая цена продажи.
+     */
+    static __resolvePrice(fields, listPrice) {
+        if (!fields.discount_type) {
+            return { sale_price: fields.sale_price, discount_type: null, discount_value: null };
+        }
+        if (listPrice === null || listPrice <= 0) {
+            throw new Error('Work price is not set: enter the sale price instead of a discount');
+        }
+        if (fields.discount_type === 'amount' && fields.discount_value > listPrice) {
+            throw new Error('Discount cannot exceed the work price');
+        }
+        return {
+            sale_price: applyDiscount(listPrice, fields.discount_type, fields.discount_value),
+            discount_type: fields.discount_type,
+            discount_value: fields.discount_value,
+        };
     }
 
     static async __getAccessibleSale(id, actorUser) {
@@ -211,17 +241,23 @@ export default class SaleService {
         const fields = SaleService.__normalize(data);
         await SaleService.__assertOwnContact(fields.contact_id, actorUser);
 
+        // При скидке валюта — валюта цены работы, иначе выбранная
+        const currency = (fields.discount_type ? artObject.f.currency : fields.currency)
+            || artObject.f.currency || fields.currency || 'RUB';
+        // Цена работы на момент продажи — база для скидки (только если
+        // продажа в той же валюте, иначе сравнивать не с чем)
+        const listPrice = currency === (artObject.f.currency || currency) ? toNumberOrNull(artObject.f.price) : null;
+        const price = SaleService.__resolvePrice(fields, listPrice);
+
         const sale = new SaleModel({
             art_id: artId,
             user_id: artObject.f.user_id,
-            // цена по прайсу и валюта по умолчанию — из самой работы
-            list_price: fields.list_price !== undefined ? fields.list_price : toNumberOrNull(artObject.f.price),
-            currency: fields.currency || artObject.f.currency || 'RUB',
+            list_price: listPrice,
+            currency,
             sale_date: fields.sale_date,
-            sale_price: fields.sale_price,
+            ...price,
             contact_id: fields.contact_id || null,
             comment: fields.comment ?? null,
-            commission_pct: fields.commission_pct ?? null,
             sold_by: actorUser.f.id,
             ctime: new Date(),
             utime: new Date(),
@@ -247,9 +283,26 @@ export default class SaleService {
             await SaleService.__assertOwnContact(fields.contact_id, actorUser);
         }
 
-        for (const [key, value] of Object.entries(fields)) {
-            sale.f[key] = value;
+        if (fields.discount_type || fields.sale_price !== undefined) {
+            // База — цена работы, зафиксированная при продаже; если её не
+            // было (цену работе задали позже) — текущая цена работы
+            let listPrice = toNumberOrNull(sale.f.list_price);
+            if (listPrice === null && fields.discount_type) {
+                const artObject = await MyArtObject.getById(sale.f.art_id);
+                listPrice = toNumberOrNull(artObject?.f.price);
+                if (listPrice !== null) {
+                    sale.f.list_price = listPrice;
+                    if (artObject.f.currency) sale.f.currency = artObject.f.currency;
+                }
+            }
+            Object.assign(sale.f, SaleService.__resolvePrice(fields, listPrice));
         }
+
+        for (const key of ['sale_date', 'contact_id', 'comment']) {
+            if (fields[key] !== undefined) sale.f[key] = fields[key];
+        }
+        // валюту меняем только у продажи без скидки (со скидкой она — валюта цены работы)
+        if (fields.currency && !sale.f.discount_type) sale.f.currency = fields.currency;
         sale.f.utime = new Date();
         await sale.save();
 

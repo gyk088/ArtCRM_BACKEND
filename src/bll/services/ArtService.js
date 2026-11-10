@@ -16,9 +16,49 @@ import SaleModel from '../models/SaleModel.js';
 import AuthorizationService from './AuthorizationService.js';
 import QuotaService from './QuotaService.js';
 import { PgObject } from 'pgobject';
-import { assertCanViewUserData, toPerson } from '../utils/userAccess.js';
+import { assertCanViewUserData, sharingScopeUserIds, toPerson } from '../utils/userAccess.js';
 
 export default class ArtService {
+    // ============= СПРАВОЧНИКИ: ОБЩИЙ ДОСТУП ВНУТРИ ГАЛЕРЕИ =============
+    //
+    // Справочники (медиа, серии, художники, статусы, локации) живут по тем
+    // же правилам, что и работы: внутри галереи (сама Gallery + её Manager'ы,
+    // см. AuthorizationService.gallerySharingScope) они общие. Иначе менеджер
+    // видит работы галереи, но не видит названий их статусов/серий/... — у
+    // работы стоит id записи из справочника галереи, которой нет в его списке.
+    // Удалять запись может только её автор или сама галерея (как и работы).
+
+    /**
+     * id пользователей, чьи справочники видит userId: он сам, а у Gallery и
+     * Manager — ещё галерея и все её менеджеры.
+     */
+    static async __refScopeUserIds(userId) {
+        const actor = await UserModel.getUserById(userId);
+        return actor ? sharingScopeUserIds(actor) : [userId];
+    }
+
+    /** Может ли userId смотреть/править (или удалить — forDelete) запись справочника */
+    static async __canUseRef(entity, userId, { forDelete = false } = {}) {
+        if (!entity) return false;
+        const ownerId = entity.f.user_id;
+        if (ownerId === userId) return true;
+
+        const [actor, owner] = await Promise.all([
+            UserModel.getUserById(userId),
+            ownerId ? UserModel.getUserById(ownerId) : null,
+        ]);
+        if (!actor || !owner) return false;
+
+        return forDelete
+            ? AuthorizationService.canDeleteWorkOwner(toPerson(actor), toPerson(owner))
+            : AuthorizationService.canAccessWorkOwner(toPerson(actor), toPerson(owner));
+    }
+
+    static async __getRefList(Model, userId) {
+        const ids = await ArtService.__refScopeUserIds(userId);
+        return Model.select('WHERE user_id = ANY($1::uuid[])', [ids]);
+    }
+
     // ============= ART OBJECT METHODS =============
 
     // Доп. изображения приходят с фронта как массив файлов ({id, ...}) либо готовых id
@@ -205,14 +245,14 @@ export default class ArtService {
 
     static async getMediaById(id, userId) {
         const media = await MyMedia.getById(id);
-        if (!media || media.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(media, userId))) {
             throw new Error('Media not found');
         }
         return media;
     }
 
     static async getAllMedia(userId) {
-        const mediaList = await MyMedia.getByUserId(userId);
+        const mediaList = await ArtService.__getRefList(MyMedia, userId);
         return mediaList;
     }
 
@@ -224,7 +264,7 @@ export default class ArtService {
 
     static async updateMedia(mediaData, userId) {
         const media = await MyMedia.getById(mediaData.id);
-        if (!media || media.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(media, userId))) {
             throw new Error('Media not found');
         }
 
@@ -236,7 +276,7 @@ export default class ArtService {
 
     static async deleteMedia(id, userId) {
         const media = await MyMedia.getById(id);
-        if (!media || media.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(media, userId, { forDelete: true }))) {
             throw new Error('Media not found');
         }
 
@@ -264,14 +304,14 @@ export default class ArtService {
 
     static async getSeriaById(id, userId) {
         const seria = await MySeria.getById(id);
-        if (!seria || seria.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(seria, userId))) {
             throw new Error('Seria not found');
         }
         return seria;
     }
 
     static async getAllSerias(userId) {
-        const seriaList = await MySeria.getByUserId(userId);
+        const seriaList = await ArtService.__getRefList(MySeria, userId);
         return seriaList;
     }
 
@@ -283,7 +323,7 @@ export default class ArtService {
 
     static async updateSeria(seriaData, userId) {
         const seria = await MySeria.getById(seriaData.id);
-        if (!seria || seria.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(seria, userId))) {
             throw new Error('Seria not found');
         }
 
@@ -295,7 +335,7 @@ export default class ArtService {
 
     static async deleteSeria(id, userId) {
         const seria = await MySeria.getById(id);
-        if (!seria || seria.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(seria, userId, { forDelete: true }))) {
             throw new Error('Seria not found');
         }
 
@@ -331,14 +371,14 @@ export default class ArtService {
 
     static async getArtistById(id, userId) {
         const artist = await MyArtist.getById(id);
-        if (!artist || artist.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(artist, userId))) {
             throw new Error('Artist not found');
         }
         return artist;
     }
 
     static async getAllArtists(userId) {
-        const artistList = await MyArtist.getByUserId(userId);
+        const artistList = await ArtService.__getRefList(MyArtist, userId);
         return artistList;
     }
 
@@ -350,7 +390,7 @@ export default class ArtService {
 
     static async updateArtist(artistData, userId) {
         const artist = await MyArtist.getById(artistData.id);
-        if (!artist || artist.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(artist, userId))) {
             throw new Error('Artist not found');
         }
 
@@ -362,7 +402,7 @@ export default class ArtService {
 
     static async deleteArtist(id, userId) {
         const artist = await MyArtist.getById(id);
-        if (!artist || artist.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(artist, userId, { forDelete: true }))) {
             throw new Error('Artist not found');
         }
 
@@ -393,14 +433,14 @@ export default class ArtService {
 
     static async getStatusById(id, userId) {
         const status = await MyStatus.getById(id);
-        if (!status || status.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(status, userId))) {
             throw new Error('Status not found');
         }
         return status;
     }
 
     static async getAllStatuses(userId) {
-        const statusList = await MyStatus.getByUserId(userId);
+        const statusList = await ArtService.__getRefList(MyStatus, userId);
         return statusList;
     }
 
@@ -412,7 +452,7 @@ export default class ArtService {
 
     static async updateStatus(statusData, userId) {
         const status = await MyStatus.getById(statusData.id);
-        if (!status || status.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(status, userId))) {
             throw new Error('Status not found');
         }
 
@@ -425,7 +465,7 @@ export default class ArtService {
 
     static async deleteStatus(id, userId) {
         const status = await MyStatus.getById(id);
-        if (!status || status.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(status, userId, { forDelete: true }))) {
             throw new Error('Status not found');
         }
 
@@ -453,14 +493,14 @@ export default class ArtService {
 
     static async getLocationById(id, userId) {
         const location = await MyLocation.getById(id);
-        if (!location || location.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(location, userId))) {
             throw new Error('Location not found');
         }
         return location;
     }
 
     static async getAllLocations(userId) {
-        const locationList = await MyLocation.getByUserId(userId);
+        const locationList = await ArtService.__getRefList(MyLocation, userId);
         return locationList;
     }
 
@@ -472,7 +512,7 @@ export default class ArtService {
 
     static async updateLocation(locationData, userId) {
         const location = await MyLocation.getById(locationData.id);
-        if (!location || location.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(location, userId))) {
             throw new Error('Location not found');
         }
 
@@ -484,7 +524,7 @@ export default class ArtService {
 
     static async deleteLocation(id, userId) {
         const location = await MyLocation.getById(id);
-        if (!location || location.f.user_id !== userId) {
+        if (!(await ArtService.__canUseRef(location, userId, { forDelete: true }))) {
             throw new Error('Location not found');
         }
 

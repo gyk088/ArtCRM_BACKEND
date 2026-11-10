@@ -47,15 +47,14 @@ export default class ReportExportService {
             { header: 'Год', key: 'year', width: 7 },
             { header: 'Серия', key: 'seria', width: 18 },
             { header: 'Медиа', key: 'media', width: 16 },
-            { header: 'Цена по прайсу', key: 'list', width: 15, style: { numFmt: MONEY_FMT } },
+            { header: 'Цена работы', key: 'list', width: 15, style: { numFmt: MONEY_FMT } },
             { header: 'Цена продажи', key: 'sale', width: 15, style: { numFmt: MONEY_FMT } },
             { header: 'Валюта сделки', key: 'currency', width: 10 },
             { header: 'Скидка, %', key: 'discount', width: 10, style: { numFmt: PCT_FMT } },
+            { header: 'Скидка, сумма', key: 'discount_amount', width: 14, style: { numFmt: MONEY_FMT } },
             { header: `Курс к ${cur}`, key: 'rate', width: 11, style: { numFmt: RATE_FMT } },
-            { header: `Прайс, ${cur}`, key: 'list_conv', width: 15, style: { numFmt: MONEY_FMT } },
+            { header: `Цена работы, ${cur}`, key: 'list_conv', width: 15, style: { numFmt: MONEY_FMT } },
             { header: `Продажа, ${cur}`, key: 'sale_conv', width: 15, style: { numFmt: MONEY_FMT } },
-            { header: 'Комиссия, %', key: 'commission_pct', width: 11, style: { numFmt: PCT_FMT } },
-            { header: `Комиссия, ${cur}`, key: 'commission', width: 14, style: { numFmt: MONEY_FMT } },
             { header: 'Покупатель', key: 'buyer', width: 22 },
             { header: 'Оформил(а)', key: 'sold_by', width: 20 },
             { header: 'Комментарий', key: 'comment', width: 30 },
@@ -74,11 +73,10 @@ export default class ReportExportService {
                 sale: r.sale_price,
                 currency: r.currency,
                 discount: r.discount_pct,
+                discount_amount: r.discount_amount,
                 rate: r.rate,
                 list_conv: r.list_price_converted,
                 sale_conv: r.sale_price_converted,
-                commission_pct: r.commission_pct,
-                commission: r.commission_converted,
                 buyer: r.contact?.name || '',
                 sold_by: personName(r.sold_by),
                 comment: r.comment || '',
@@ -95,7 +93,7 @@ export default class ReportExportService {
             const last = rows.length + 1;
             const totalRow = ws.addRow({ art: 'Итого (с курсом)' });
             totalRow.font = { bold: true };
-            for (const key of ['list_conv', 'sale_conv', 'commission']) {
+            for (const key of ['list_conv', 'sale_conv']) {
                 const col = ws.getColumn(key).letter;
                 totalRow.getCell(key).value = { formula: `SUM(${col}${first}:${col}${last})` };
             }
@@ -120,7 +118,6 @@ export default class ReportExportService {
         kv(`Средний чек, ${cur}`, summary.avg_check, MONEY_FMT);
         kv('Средняя скидка, %', summary.avg_discount_pct, PCT_FMT);
         kv(`Сумма скидок, ${cur}`, summary.discount_amount, MONEY_FMT);
-        kv(`Комиссия галереи, ${cur}`, summary.commission_total, MONEY_FMT);
         if (summary.missing_rates.length) {
             const warn = ss.addRow([
                 'Не вошли в итог (нет курса): ' +

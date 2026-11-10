@@ -341,7 +341,7 @@ export default class ReportService {
 
         const result = await PgObject.query(`
             SELECT s.id, s.art_id, s.sale_date, s.list_price, s.sale_price, s.currency,
-                s.commission_pct, s.comment, s.contact_id, s.sold_by,
+                s.discount_type, s.discount_value, s.comment, s.contact_id, s.sold_by,
                 ao.name AS art_name, ao.year AS art_year, ao.technique AS art_technique, ao.size AS art_size,
                 ao.artist AS artist_id, a.name AS artist_name,
                 ao.seria AS seria_id, se.name AS seria_name,
@@ -382,7 +382,6 @@ export default class ReportService {
             const salePrice = toNum(r.sale_price);
             const rate = rateFor(r.currency);
             const discountPct = listPrice && listPrice > 0 ? round2(((listPrice - salePrice) / listPrice) * 100) : null;
-            const commissionPct = toNum(r.commission_pct);
             const converted = rate === null ? null : round2(salePrice * rate);
             return {
                 sale_id: r.id,
@@ -400,11 +399,12 @@ export default class ReportService {
                 list_price: listPrice,
                 sale_price: salePrice,
                 discount_pct: discountPct,
+                discount_amount: listPrice === null ? null : round2(listPrice - salePrice),
+                discount_type: r.discount_type ?? null,
+                discount_value: toNum(r.discount_value),
                 rate,
                 list_price_converted: rate === null || listPrice === null ? null : round2(listPrice * rate),
                 sale_price_converted: converted,
-                commission_pct: commissionPct,
-                commission_converted: converted === null || commissionPct === null ? null : round2(converted * commissionPct / 100),
                 contact: r.contact_id ? { id: r.contact_id, name: r.contact_name } : null,
                 sold_by: r.sold_by ? { id: r.sold_by, name: r.sold_by_name, surname: r.sold_by_surname } : null,
                 comment: r.comment,
@@ -438,7 +438,6 @@ export default class ReportService {
         const totalList = round2(withList.reduce((acc, r) => acc + r.list_price_converted, 0));
         const totalListedSales = round2(withList.reduce((acc, r) => acc + r.sale_price_converted, 0));
         const withDiscount = rows.filter(r => r.discount_pct !== null);
-        const commission = round2(converted.reduce((acc, r) => acc + (r.commission_converted || 0), 0));
 
         const group = (keyFn, labelFn) => {
             const map = new Map();
@@ -463,13 +462,12 @@ export default class ReportService {
             converted_count: converted.length,
             total,
             avg_check: converted.length ? round2(total / converted.length) : null,
-            // Средняя скидка — по строкам, где известна цена по прайсу
+            // Средняя скидка — по строкам, где известна цена работы
             avg_discount_pct: withDiscount.length
                 ? round2(withDiscount.reduce((acc, r) => acc + r.discount_pct, 0) / withDiscount.length)
                 : null,
-            // Сколько "отдали" скидками в деньгах (прайс − продажа) по строкам с прайсом
+            // Сколько "отдали" скидками в деньгах (цена работы − продажа) по строкам с ценой работы
             discount_amount: round2(totalList - totalListedSales),
-            commission_total: commission,
             missing_rates: [...missing.entries()].map(([currency, count]) => ({ currency, count })),
             by_currency: group(r => r.currency, r => ({ currency: r.currency, rate: rateFor(r.currency) }))
                 .map(g => ({

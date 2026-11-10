@@ -1,5 +1,6 @@
 import UserModel from '../models/UserModel.js';
 import AuthorizationService from '../services/AuthorizationService.js';
+import { PgObject } from 'pgobject';
 
 export function toPerson(user) {
     return { id: user.f.id, role: user.f.role, managed_by_gallery_id: user.f.managed_by_gallery_id };
@@ -32,4 +33,27 @@ export async function assertCanViewUserData(actorUser, targetUserId) {
         throw new Error('User not found');
     }
     return target.f.id;
+}
+
+/**
+ * id пользователей, чьими данными (справочники, файлы) пользователь делится
+ * внутри галереи: он сам, а у Gallery и Manager — ещё сама галерея и все её
+ * менеджеры (см. AuthorizationService.gallerySharingScope). У остальных —
+ * только он сам.
+ *
+ * @param {object} user - PgObject пользователя (request.user / UserModel)
+ * @return {Promise<string[]>}
+ */
+export async function sharingScopeUserIds(user) {
+    const userId = user.f.id;
+    const scope = AuthorizationService.gallerySharingScope(toPerson(user));
+    if (!scope) return [userId];
+
+    const result = await PgObject.query(
+        `SELECT id FROM my_user WHERE id = $1 OR (managed_by_gallery_id = $1 AND role = 'manager')`,
+        [scope]
+    );
+    const ids = result.rows.map(r => r.id);
+    if (!ids.includes(userId)) ids.push(userId);
+    return ids;
 }
