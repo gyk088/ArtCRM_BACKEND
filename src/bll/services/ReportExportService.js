@@ -55,6 +55,10 @@ export default class ReportExportService {
             { header: `Курс к ${cur}`, key: 'rate', width: 11, style: { numFmt: RATE_FMT } },
             { header: `Цена работы, ${cur}`, key: 'list_conv', width: 15, style: { numFmt: MONEY_FMT } },
             { header: `Продажа, ${cur}`, key: 'sale_conv', width: 15, style: { numFmt: MONEY_FMT } },
+            { header: 'Комиссия, %', key: 'commission_pct', width: 11, style: { numFmt: PCT_FMT } },
+            { header: `Комиссия, ${cur}`, key: 'commission', width: 14, style: { numFmt: MONEY_FMT } },
+            { header: `Художнику, ${cur}`, key: 'net', width: 15, style: { numFmt: MONEY_FMT } },
+            { header: 'Расчёт с художником', key: 'paid', width: 12 },
             { header: 'Покупатель', key: 'buyer', width: 22 },
             { header: 'Оформил(а)', key: 'sold_by', width: 20 },
             { header: 'Комментарий', key: 'comment', width: 30 },
@@ -77,10 +81,19 @@ export default class ReportExportService {
                 rate: r.rate,
                 list_conv: r.list_price_converted,
                 sale_conv: r.sale_price_converted,
+                commission_pct: r.commission_pct,
+                commission: r.commission_converted,
+                net: r.net_converted,
+                paid: r.artist_paid ? 'Да' : 'Нет',
                 buyer: r.contact?.name || '',
                 sold_by: personName(r.sold_by),
                 comment: r.comment || '',
             });
+            // Индивидуальная комиссия (не общая отчёта) — выделяем
+            if (r.commission_source === 'individual') {
+                row.getCell('commission_pct').font = { bold: true, color: { argb: 'FF8A6D2F' } };
+                row.getCell('commission_pct').note = 'Индивидуальная комиссия для этой продажи';
+            }
             // Нет курса — подсвечиваем, чтобы было видно, почему строка не в итоге
             if (r.rate === null) {
                 row.getCell('rate').value = 'нет курса';
@@ -93,7 +106,7 @@ export default class ReportExportService {
             const last = rows.length + 1;
             const totalRow = ws.addRow({ art: 'Итого (с курсом)' });
             totalRow.font = { bold: true };
-            for (const key of ['list_conv', 'sale_conv']) {
+            for (const key of ['list_conv', 'sale_conv', 'commission', 'net']) {
                 const col = ws.getColumn(key).letter;
                 totalRow.getCell(key).value = { formula: `SUM(${col}${first}:${col}${last})` };
             }
@@ -118,6 +131,10 @@ export default class ReportExportService {
         kv(`Средний чек, ${cur}`, summary.avg_check, MONEY_FMT);
         kv('Средняя скидка, %', summary.avg_discount_pct, PCT_FMT);
         kv(`Сумма скидок, ${cur}`, summary.discount_amount, MONEY_FMT);
+        kv(`Комиссия галереи, ${cur}`, summary.commission_total, MONEY_FMT).font = { bold: true };
+        kv(`К выплате, ${cur}`, summary.net_total, MONEY_FMT).font = { bold: true };
+        kv(`Выплачено, ${cur}`, summary.paid_total, MONEY_FMT);
+        kv(`Осталось выплатить, ${cur}`, summary.unpaid_total, MONEY_FMT);
         if (summary.missing_rates.length) {
             const warn = ss.addRow([
                 'Не вошли в итог (нет курса): ' +
@@ -143,11 +160,14 @@ export default class ReportExportService {
                 { value: g.rate ?? 'нет курса', fmt: g.rate ? RATE_FMT : null },
                 { value: g.rate ? g.total : null, fmt: MONEY_FMT },
             ]));
-        table('По художникам', ['Художник', 'Продаж', `Сумма, ${cur}`, 'Без курса'],
+        table('По художникам', ['Художник', 'Продаж', `Сумма, ${cur}`, `Комиссия, ${cur}`, `К выплате, ${cur}`, `Выплачено, ${cur}`, 'Без курса'],
             summary.by_artist.map(g => [
                 { value: g.artist?.name || 'Не указан' },
                 { value: g.count },
                 { value: g.total, fmt: MONEY_FMT },
+                { value: g.commission, fmt: MONEY_FMT },
+                { value: g.net, fmt: MONEY_FMT },
+                { value: g.paid, fmt: MONEY_FMT },
                 { value: g.count_without_rate || null },
             ]));
         table('По месяцам', ['Месяц', 'Продаж', `Сумма, ${cur}`, 'Без курса'],
@@ -169,6 +189,8 @@ export default class ReportExportService {
         const params = [
             ['Отчёт', report.name],
             ['Валюта отчёта', cur],
+            ['Комиссия галереи', report.commission_pct !== null ? `${report.commission_pct}%` : 'не задана'],
+            ['Индивидуальные комиссии', `${summary.individual_commission_count} прод.`],
             ['Сформирован', new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Minsk' })],
             ['Период', `${f.date_from ? fmtDate(f.date_from) : 'с начала'} — ${f.date_to ? fmtDate(f.date_to) : 'по сегодня'}`],
             ['Художники', names.artists || 'все'],
@@ -177,6 +199,7 @@ export default class ReportExportService {
             ['Покупатели', names.contacts || 'все'],
             ['Оформили', names.sold_by || 'все'],
             ['Валюты сделок', f.currencies.length ? f.currencies.join(', ') : 'все'],
+            ['Расчёт с художником', { any: 'все', paid: 'рассчитано', unpaid: 'не рассчитано' }[f.artist_paid] || 'все'],
             ['Скидка', DISCOUNT_LABELS[f.discount] +
                 (f.discount_min !== null || f.discount_max !== null
                     ? `, от ${f.discount_min ?? '—'}% до ${f.discount_max ?? '—'}%` : '')],

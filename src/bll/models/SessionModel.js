@@ -53,11 +53,9 @@ export default class SessionModel extends PgObject {
     // Немедленно инвалидирует все активные сессии пользователя — используется
     // при блокировке, чтобы уже выданные токены сразу переставали работать.
     static async deleteAllForUser(userId) {
-        const sessions = await SessionModel.select('WHERE user_id = $1', [userId]);
-        for (const session of sessions) {
-            await session.delete();
-        }
-        return { success: true, deleted: sessions.length };
+        // один запрос вместо загрузки и удаления строк по одной
+        const result = await PgObject.query(`DELETE FROM ${SessionModel.table} WHERE user_id = $1`, [userId]);
+        return { success: true, deleted: result.rowCount };
     }
 
     async generateToken() {

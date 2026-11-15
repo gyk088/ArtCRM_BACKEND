@@ -1,5 +1,6 @@
 import { PgObject } from 'pgobject';
 import { getFileBaseUrl } from '../utils/const.js';
+import { thumbUrl } from '../utils/thumbs.js';
 
 export default class ArtImageModel extends PgObject {
   static get schema() {
@@ -24,13 +25,9 @@ export default class ArtImageModel extends PgObject {
   }
 
   static async removeAllImagesFromArt(artId) {
-    const relations = await ArtImageModel.select('WHERE art_id = $1', [artId]);
-
-    for (const relation of relations) {
-      await relation.delete();
-    }
-
-    return { success: true, deleted: relations.length };
+    // один запрос вместо загрузки и удаления строк по одной
+    const result = await PgObject.query(`DELETE FROM ${ArtImageModel.table} WHERE art_id = $1`, [artId]);
+    return { success: true, deleted: result.rowCount };
   }
 
   /**
@@ -41,14 +38,14 @@ export default class ArtImageModel extends PgObject {
    * @static
   */
   static async setImagesForArt(artId, fileIds) {
-    await ArtImageModel.removeAllImagesFromArt(artId);
-
-    let orderNum = 0;
-    for (const fileId of fileIds) {
-      const relation = new ArtImageModel({ art_id: artId, file_id: fileId, order_num: orderNum });
-      await relation.save();
-      orderNum++;
-    }
+    // Весь список меняется атомарно: при ошибке остаётся прежний состав,
+    // а не половина. Вставка — одним запросом (insertMany).
+    await PgObject.createTransaction(async () => {
+      await ArtImageModel.removeAllImagesFromArt(artId);
+      if (fileIds.length) {
+        await ArtImageModel.insertMany(fileIds.map((fileId, orderNum) => ({ art_id: artId, file_id: fileId, order_num: orderNum })));
+      }
+    });
   }
 
   /**
@@ -72,7 +69,8 @@ export default class ArtImageModel extends PgObject {
       ext: row.ext,
       name: row.name,
       comment: row.comment,
-      url: `${getFileBaseUrl()}/${row.id}.${row.ext}`
+      url: `${getFileBaseUrl()}/${row.id}.${row.ext}`,
+      thumb_url: thumbUrl(row.id, row.ext)
     }));
   }
 

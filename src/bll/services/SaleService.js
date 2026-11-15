@@ -69,6 +69,8 @@ export default class SaleService {
                 ? { id: row.sold_by, name: row.sold_by_name ?? null, surname: row.sold_by_surname ?? null }
                 : null,
             comment: row.comment,
+            artist_paid: !!row.artist_paid,
+            artist_paid_at: row.artist_paid_at ?? null,
             ctime: row.ctime,
             utime: row.utime,
         };
@@ -131,6 +133,11 @@ export default class SaleService {
             out.currency = data.currency;
         }
 
+        if (has('artist_paid')) {
+            if (typeof data.artist_paid !== 'boolean') throw new Error('artist_paid must be true or false');
+            out.artist_paid = data.artist_paid;
+        }
+
         if (has('comment')) {
             if (data.comment !== null && typeof data.comment !== 'string') throw new Error('comment must be a string');
             if (data.comment && data.comment.length > MAX_COMMENT_LENGTH) {
@@ -155,7 +162,8 @@ export default class SaleService {
         } catch {
             // невалидный uuid
         }
-        if (!contact || contact.f.user_id !== actorUser.f.id) {
+        // контакты внутри галереи общие (см. ContactService)
+        if (!(await ArtService.__canUseRef(contact, actorUser.f.id))) {
             throw new Error('Contact not found');
         }
     }
@@ -300,6 +308,12 @@ export default class SaleService {
 
         for (const key of ['sale_date', 'contact_id', 'comment']) {
             if (fields[key] !== undefined) sale.f[key] = fields[key];
+        }
+        // расчёт с художником: запоминаем, кто и когда отметил
+        if (fields.artist_paid !== undefined && fields.artist_paid !== !!sale.f.artist_paid) {
+            sale.f.artist_paid = fields.artist_paid;
+            sale.f.artist_paid_at = fields.artist_paid ? new Date() : null;
+            sale.f.artist_paid_by = fields.artist_paid ? actorUser.f.id : null;
         }
         // валюту меняем только у продажи без скидки (со скидкой она — валюта цены работы)
         if (fields.currency && !sale.f.discount_type) sale.f.currency = fields.currency;

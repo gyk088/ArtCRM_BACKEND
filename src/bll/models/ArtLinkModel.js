@@ -74,23 +74,15 @@ export default class ArtLinkModel extends PgObject {
   }
 
   static async removeAllLinksFromArt(artId) {
-    const relations = await ArtLinkModel.select('WHERE art_id = $1', [artId]);
-    
-    for (const relation of relations) {
-      await relation.delete();
-    }
-    
-    return { success: true, deleted: relations.length };
+    // один запрос вместо загрузки и удаления строк по одной
+    const result = await PgObject.query(`DELETE FROM ${ArtLinkModel.table} WHERE art_id = $1`, [artId]);
+    return { success: true, deleted: result.rowCount };
   }
 
   static async removeAllArtsFromLink(linkId) {
-    const relations = await ArtLinkModel.select('WHERE link_id = $1', [linkId]);
-    
-    for (const relation of relations) {
-      await relation.delete();
-    }
-    
-    return { success: true, deleted: relations.length };
+    // один запрос вместо загрузки и удаления строк по одной
+    const result = await PgObject.query(`DELETE FROM ${ArtLinkModel.table} WHERE link_id = $1`, [linkId]);
+    return { success: true, deleted: result.rowCount };
   }
 
   static async getCompleteLinksForArt(artId) {

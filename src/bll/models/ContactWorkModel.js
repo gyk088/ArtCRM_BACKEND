@@ -35,11 +35,9 @@ export default class ContactWorkModel extends PgObject {
   }
 
   static async removeAllWorksFromContact(contactId) {
-    const relations = await ContactWorkModel.select('WHERE contact_id = $1', [contactId]);
-    for (const relation of relations) {
-      await relation.delete();
-    }
-    return { success: true, deleted: relations.length };
+    // один запрос вместо загрузки и удаления строк по одной
+    const result = await PgObject.query(`DELETE FROM ${ContactWorkModel.table} WHERE contact_id = $1`, [contactId]);
+    return { success: true, deleted: result.rowCount };
   }
 
   /**
@@ -51,11 +49,9 @@ export default class ContactWorkModel extends PgObject {
    * @static
   */
   static async removeArtFromAllContacts(artId) {
-    const relations = await ContactWorkModel.select('WHERE art_id = $1', [artId]);
-    for (const relation of relations) {
-      await relation.delete();
-    }
-    return { success: true, deleted: relations.length };
+    // один запрос вместо загрузки и удаления строк по одной
+    const result = await PgObject.query(`DELETE FROM ${ContactWorkModel.table} WHERE art_id = $1`, [artId]);
+    return { success: true, deleted: result.rowCount };
   }
 
   /**

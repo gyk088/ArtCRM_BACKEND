@@ -30,13 +30,9 @@ export default class ExhibitionWorkModel extends PgObject {
   }
 
   static async removeAllWorksFromExhibition(exhibitionId) {
-    const relations = await ExhibitionWorkModel.select('WHERE exhibition_id = $1', [exhibitionId]);
-
-    for (const relation of relations) {
-      await relation.delete();
-    }
-
-    return { success: true, deleted: relations.length };
+    // один запрос вместо загрузки и удаления строк по одной
+    const result = await PgObject.query(`DELETE FROM ${ExhibitionWorkModel.table} WHERE exhibition_id = $1`, [exhibitionId]);
+    return { success: true, deleted: result.rowCount };
   }
 
   /**
@@ -47,13 +43,9 @@ export default class ExhibitionWorkModel extends PgObject {
    * @static
   */
   static async removeArtFromAllExhibitions(artId) {
-    const relations = await ExhibitionWorkModel.select('WHERE art_id = $1', [artId]);
-
-    for (const relation of relations) {
-      await relation.delete();
-    }
-
-    return { success: true, deleted: relations.length };
+    // один запрос вместо загрузки и удаления строк по одной
+    const result = await PgObject.query(`DELETE FROM ${ExhibitionWorkModel.table} WHERE art_id = $1`, [artId]);
+    return { success: true, deleted: result.rowCount };
   }
 
   /**
@@ -64,14 +56,14 @@ export default class ExhibitionWorkModel extends PgObject {
    * @static
   */
   static async setWorksForExhibition(exhibitionId, artIds) {
-    await ExhibitionWorkModel.removeAllWorksFromExhibition(exhibitionId);
-
-    let orderNum = 0;
-    for (const artId of artIds) {
-      const relation = new ExhibitionWorkModel({ exhibition_id: exhibitionId, art_id: artId, order_num: orderNum });
-      await relation.save();
-      orderNum++;
-    }
+    // Весь список меняется атомарно: при ошибке остаётся прежний состав,
+    // а не половина. Вставка — одним запросом (insertMany).
+    await PgObject.createTransaction(async () => {
+      await ExhibitionWorkModel.removeAllWorksFromExhibition(exhibitionId);
+      if (artIds.length) {
+        await ExhibitionWorkModel.insertMany(artIds.map((artId, orderNum) => ({ exhibition_id: exhibitionId, art_id: artId, order_num: orderNum })));
+      }
+    });
   }
 
   /**

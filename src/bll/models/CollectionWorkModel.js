@@ -30,13 +30,9 @@ export default class CollectionWorkModel extends PgObject {
   }
 
   static async removeAllWorksFromCollection(collectionId) {
-    const relations = await CollectionWorkModel.select('WHERE collection_id = $1', [collectionId]);
-
-    for (const relation of relations) {
-      await relation.delete();
-    }
-
-    return { success: true, deleted: relations.length };
+    // один запрос вместо загрузки и удаления строк по одной
+    const result = await PgObject.query(`DELETE FROM ${CollectionWorkModel.table} WHERE collection_id = $1`, [collectionId]);
+    return { success: true, deleted: result.rowCount };
   }
 
   /**
@@ -47,13 +43,9 @@ export default class CollectionWorkModel extends PgObject {
    * @static
   */
   static async removeArtFromAllCollections(artId) {
-    const relations = await CollectionWorkModel.select('WHERE art_id = $1', [artId]);
-
-    for (const relation of relations) {
-      await relation.delete();
-    }
-
-    return { success: true, deleted: relations.length };
+    // один запрос вместо загрузки и удаления строк по одной
+    const result = await PgObject.query(`DELETE FROM ${CollectionWorkModel.table} WHERE art_id = $1`, [artId]);
+    return { success: true, deleted: result.rowCount };
   }
 
   /**
@@ -64,14 +56,14 @@ export default class CollectionWorkModel extends PgObject {
    * @static
   */
   static async setWorksForCollection(collectionId, artIds) {
-    await CollectionWorkModel.removeAllWorksFromCollection(collectionId);
-
-    let orderNum = 0;
-    for (const artId of artIds) {
-      const relation = new CollectionWorkModel({ collection_id: collectionId, art_id: artId, order_num: orderNum });
-      await relation.save();
-      orderNum++;
-    }
+    // Весь список меняется атомарно: при ошибке остаётся прежний состав,
+    // а не половина. Вставка — одним запросом (insertMany).
+    await PgObject.createTransaction(async () => {
+      await CollectionWorkModel.removeAllWorksFromCollection(collectionId);
+      if (artIds.length) {
+        await CollectionWorkModel.insertMany(artIds.map((artId, orderNum) => ({ collection_id: collectionId, art_id: artId, order_num: orderNum })));
+      }
+    });
   }
 
   /**

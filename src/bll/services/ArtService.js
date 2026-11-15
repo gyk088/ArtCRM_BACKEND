@@ -4,6 +4,7 @@ import MySeria from '../models/SeriaModel.js';
 import MyStatus from '../models/StatusModel.js';
 import MyLocation from '../models/LocationModel.js';
 import MyArtist from '../models/ArtistModel.js';
+import MyTag from '../models/TagModel.js';
 import LinkArtistModel from '../models/LinkArtistModel.js';
 import MyArtObjectUser from '../models/ArtUserModel.js';
 import ArtImageModel from '../models/ArtImageModel.js';
@@ -17,6 +18,16 @@ import AuthorizationService from './AuthorizationService.js';
 import QuotaService from './QuotaService.js';
 import { PgObject } from 'pgobject';
 import { assertCanViewUserData, sharingScopeUserIds, toPerson } from '../utils/userAccess.js';
+
+// Массовое изменение: какие поля можно менять и в каком справочнике их искать
+const BULK_REF_FIELDS = {
+    artist: MyArtist,
+    location: MyLocation,
+    seria: MySeria,
+    media: MyMedia,
+    status: MyStatus,
+};
+const BULK_UPDATE_LIMIT = 1000;
 
 export default class ArtService {
     // ============= СПРАВОЧНИКИ: ОБЩИЙ ДОСТУП ВНУТРИ ГАЛЕРЕИ =============
@@ -97,7 +108,9 @@ export default class ArtService {
     }
 
     static async createArtObject(artData, actorUser) {
-        const { images, ...artFields } = artData;
+        const { images, tags, ...artFields } = artData;
+        // теги проверяем до создания работы — чтобы при ошибке не осталось половины
+        const tagIds = tags !== undefined ? await ArtService.__normalizeTagIds(tags, actorUser.f.id) : null;
         const artObject = new MyArtObject({
             ...artFields,
             user_id: actorUser.f.id,
@@ -111,6 +124,7 @@ export default class ArtService {
         if (Array.isArray(images)) {
             await ArtImageModel.setImagesForArt(artObject.f.id, this.__extractImageFileIds(images));
         }
+        if (tagIds) await ArtService.__setTagsForArt(artObject.f.id, tagIds);
 
         return MyArtObject.getByIdWithAvatar(artObject.f.id);
     }
@@ -167,6 +181,7 @@ export default class ArtService {
     static async updateArtObject(artData, actorUser) {
         const artObject = await MyArtObject.getById(artData.id);
         await ArtService.__assertCanAccessWork(actorUser, artObject);
+        const tagIds = artData.tags !== undefined ? await ArtService.__normalizeTagIds(artData.tags, actorUser.f.id) : null;
 
         // Обновляем только переданные поля
         artObject.f.name = artData.name !== undefined ? artData.name : artObject.f.name;
@@ -190,6 +205,7 @@ export default class ArtService {
         if (Array.isArray(artData.images)) {
             await ArtImageModel.setImagesForArt(artObject.f.id, this.__extractImageFileIds(artData.images));
         }
+        if (tagIds) await ArtService.__setTagsForArt(artObject.f.id, tagIds);
 
         return MyArtObject.getByIdWithAvatar(artObject.f.id);
     }
@@ -479,6 +495,95 @@ export default class ArtService {
         return { success: true, message: 'Status deleted successfully' };
     }
 
+    // ============= TAG METHODS =============
+    // Теги — справочник как статусы (название + цвет), но у работы их может
+    // быть сколько угодно. Внутри галереи общие (__getRefList/__canUseRef).
+    // Удалить тег можно даже если он используется — он просто снимется со
+    // всех работ (ON DELETE CASCADE в my_art_object_tag).
+
+    static async createTag(tagData, userId) {
+        const tag = new MyTag({
+            name: tagData?.name,
+            color: tagData?.color ?? null,
+            user_id: userId,
+            ctime: new Date(),
+        });
+        await tag.save();
+        return tag;
+    }
+
+    static async getTagById(id, userId) {
+        let tag = null;
+        try {
+            tag = await MyTag.getById(id);
+        } catch {
+            // невалидный uuid
+        }
+        if (!(await ArtService.__canUseRef(tag, userId))) {
+            throw new Error('Tag not found');
+        }
+        return tag;
+    }
+
+    static async getAllTags(userId) {
+        const tags = await ArtService.__getRefList(MyTag, userId);
+        return tags.sort((a, b) => String(a.f.name).localeCompare(String(b.f.name), 'ru'));
+    }
+
+    static async getTagByUserId(targetUserId, actorUser) {
+        const userId = await assertCanViewUserData(actorUser, targetUserId);
+        return MyTag.getByUserId(userId);
+    }
+
+    static async updateTag(tagData, userId) {
+        const tag = await ArtService.getTagById(tagData?.id, userId);
+        if (tagData.name !== undefined) tag.f.name = tagData.name;
+        if (tagData.color !== undefined) tag.f.color = tagData.color;
+        await tag.save();
+        return tag;
+    }
+
+    static async deleteTag(id, userId) {
+        let tag = null;
+        try {
+            tag = await MyTag.getById(id);
+        } catch {
+            // невалидный uuid
+        }
+        if (!(await ArtService.__canUseRef(tag, userId, { forDelete: true }))) {
+            throw new Error('Tag not found');
+        }
+        const used = await PgObject.query('SELECT COUNT(*)::int AS n FROM my_art_object_tag WHERE tag_id = $1', [id]);
+        await tag.delete();
+        return { success: true, message: 'Tag deleted successfully', removedFromWorks: used.rows[0].n };
+    }
+
+    /**
+     * Теги из запроса -> массив id. Принимаем id или объекты {id}; все теги
+     * должны быть видны пользователю (свои или общие теги галереи).
+     */
+    static async __normalizeTagIds(tags, userId) {
+        if (tags === null) return [];
+        if (!Array.isArray(tags)) throw new Error('tags must be an array');
+        const ids = [...new Set(tags.map(t => (t && typeof t === 'object' ? t.id : t)).map(String))];
+        if (!ids.length) return [];
+        if (ids.some(id => !/^[0-9a-f-]{36}$/i.test(id))) throw new Error('Tag not found');
+
+        const scope = await ArtService.__refScopeUserIds(userId);
+        const found = await PgObject.query(
+            'SELECT id FROM my_tag WHERE id = ANY($1::uuid[]) AND user_id = ANY($2::uuid[])', [ids, scope]
+        );
+        if (found.rows.length !== ids.length) throw new Error('Tag not found');
+        return ids;
+    }
+
+    static async __setTagsForArt(artId, tagIds) {
+        await PgObject.query('DELETE FROM my_art_object_tag WHERE art_id = $1', [artId]);
+        for (const tagId of tagIds) {
+            await PgObject.query('INSERT INTO my_art_object_tag (art_id, tag_id) VALUES ($1, $2)', [artId, tagId]);
+        }
+    }
+
     // ============= LOCATION METHODS =============
 
     static async createLocation(locationData, userId) {
@@ -648,8 +753,8 @@ export default class ArtService {
      * Массовое создание работ. Сначала валидируем все записи (сеттеры схемы
      * проверяют цену/год/валюту при создании объекта), и только потом
      * сохраняем — чтобы ошибка в одной записи не оставила половину созданных.
-     * (PgObject.createTransaction здесь не подходит: с Pool он открывает
-     * транзакцию на случайном соединении и молча проглатывает ошибки.)
+     * Само сохранение — в транзакции (pgobject 3: своё соединение из Pool,
+     * ошибка откатывает всё и пробрасывается дальше).
      */
     static async bulkCreateArtObjects(artObjectsData, actorUser) {
         artObjectsData.forEach((artData, index) => {
@@ -662,17 +767,126 @@ export default class ArtService {
             try {
                 const artFields = { ...artData };
                 delete artFields.images;
+                delete artFields.tags;
                 new MyArtObject({ ...artFields, user_id: actorUser.f.id });
             } catch (e) {
                 throw new Error(`Item ${index}: ${e.message}`);
             }
         });
 
-        const createdObjects = [];
-        for (const artData of artObjectsData) {
-            createdObjects.push(await this.createArtObject(artData, actorUser));
+        return PgObject.createTransaction(async () => {
+            const createdObjects = [];
+            for (const artData of artObjectsData) {
+                createdObjects.push(await this.createArtObject(artData, actorUser));
+            }
+            return createdObjects;
+        });
+    }
+
+    /**
+     * Массовое изменение работ (POST /art-objects/bulk-update).
+     *
+     * changes:
+     *   fields   — { artist, location, seria, media, status }: id записи
+     *              справочника или null (очистить). Отсутствующий ключ — не трогать.
+     *   tags     — { mode: 'add' | 'remove' | 'set', ids: [...] }
+     *   price_pct — изменить цену на N% (например 10 или -15); работы без
+     *              цены не трогаем, результат округляем до целого
+     *
+     * Всё проверяем ДО первого изменения (доступ к каждой работе, что записи
+     * справочников и теги свои или общие галереи) — либо меняются все
+     * работы, либо (при ошибке) ни одной.
+     */
+    static async bulkUpdateArtObjects(ids, changes, actorUser) {
+        if (!Array.isArray(ids) || !ids.length) throw new Error('ids array is required');
+        const uniqueIds = [...new Set(ids.map(String))];
+        if (uniqueIds.length > BULK_UPDATE_LIMIT) throw new Error(`Too many art objects (max ${BULK_UPDATE_LIMIT})`);
+        if (!changes || typeof changes !== 'object') throw new Error('changes are required');
+
+        // --- поля-справочники
+        const fields = {};
+        const rawFields = changes.fields && typeof changes.fields === 'object' ? changes.fields : {};
+        for (const [key, value] of Object.entries(rawFields)) {
+            const Model = BULK_REF_FIELDS[key];
+            if (!Model) throw new Error(`Field ${key} cannot be changed in bulk`);
+            if (value === null || value === '') {
+                fields[key] = null;
+                continue;
+            }
+            let entity = null;
+            try {
+                entity = await Model.getById(String(value));
+            } catch {
+                // невалидный uuid
+            }
+            if (!(await ArtService.__canUseRef(entity, actorUser.f.id))) throw new Error(`Invalid ${key}`);
+            fields[key] = entity.f.id;
         }
-        return createdObjects;
+
+        // --- теги
+        let tags = null;
+        if (changes.tags !== undefined && changes.tags !== null) {
+            const { mode } = changes.tags;
+            if (!['add', 'remove', 'set'].includes(mode)) throw new Error('tags.mode must be add, remove or set');
+            tags = { mode, ids: await ArtService.__normalizeTagIds(changes.tags.ids || [], actorUser.f.id) };
+            if (mode !== 'set' && !tags.ids.length) tags = null;
+        }
+
+        // --- цена
+        let pricePct = null;
+        if (changes.price_pct !== undefined && changes.price_pct !== null && changes.price_pct !== '') {
+            pricePct = Number(changes.price_pct);
+            if (!Number.isFinite(pricePct) || pricePct <= -100 || pricePct > 1000) {
+                throw new Error('price_pct must be greater than -100 and at most 1000');
+            }
+            if (pricePct === 0) pricePct = null;
+        }
+
+        if (!Object.keys(fields).length && !tags && pricePct === null) throw new Error('Nothing to change');
+
+        // --- доступ ко всем работам
+        const works = [];
+        for (const id of uniqueIds) {
+            let artObject = null;
+            try {
+                artObject = await MyArtObject.getById(id);
+            } catch {
+                // невалидный uuid
+            }
+            await ArtService.__assertCanAccessWork(actorUser, artObject);
+            works.push(artObject);
+        }
+
+        // --- применяем: всё в одной транзакции — меняются все работы или ни одной
+        await PgObject.createTransaction(async () => {
+            const now = new Date();
+            for (const artObject of works) {
+                Object.assign(artObject.f, fields);
+                if (pricePct !== null && artObject.f.price !== null && artObject.f.price !== undefined && artObject.f.price !== '') {
+                    artObject.f.price = Math.round(Number(artObject.f.price) * (100 + pricePct) / 100);
+                }
+                artObject.f.updated_by = actorUser.f.id;
+                artObject.f.utime = now;
+            }
+            // поля работ — одним UPDATE на каждый набор изменённых полей
+            await MyArtObject.updateMany(works);
+
+            if (tags) {
+                for (const artObject of works) {
+                    const current = (await PgObject.query(
+                        'SELECT tag_id::text AS id FROM my_art_object_tag WHERE art_id = $1', [artObject.f.id]
+                    )).rows.map(r => r.id);
+                    let next = tags.ids;
+                    if (tags.mode === 'add') next = [...new Set([...current, ...tags.ids])];
+                    if (tags.mode === 'remove') next = current.filter(id => !tags.ids.includes(id));
+                    await ArtService.__setTagsForArt(artObject.f.id, next);
+                }
+            }
+        });
+
+        const updated = [];
+        for (const artObject of works) updated.push(await MyArtObject.getByIdWithAvatar(artObject.f.id));
+        return { updated: updated.length, objects: updated };
     }
 
     /**
@@ -686,15 +900,19 @@ export default class ArtService {
             await ArtService.__assertCanAccessWork(actorUser, artObject, { forDelete: true });
             await ArtService.__assertNotSold(artObject);
         }
-        for (const id of uniqueIds) {
-            await ArtService.deleteArtObject(id, actorUser);
-        }
+        await PgObject.createTransaction(async () => {
+            for (const id of uniqueIds) {
+                await ArtService.deleteArtObject(id, actorUser);
+            }
+        });
         return { success: true, deleted: uniqueIds.length };
     }
 
     static async updateArtObjectPartial(id, updates, actorUser) {
         const artObject = await MyArtObject.getById(id);
         await ArtService.__assertCanAccessWork(actorUser, artObject);
+        // теги — не колонка работы, а связь (my_art_object_tag); проверяем до сохранения
+        const tagIds = updates.tags !== undefined ? await ArtService.__normalizeTagIds(updates.tags, actorUser.f.id) : null;
 
         // Обновляем только те поля, которые есть в схеме
         // (artObject.f — Proxy поверх схемы, hasOwnProperty через него не работает,
@@ -710,6 +928,7 @@ export default class ArtService {
         artObject.f.updated_by = actorUser.f.id;
         artObject.f.utime = new Date();
         await artObject.save();
+        if (tagIds) await ArtService.__setTagsForArt(id, tagIds);
 
         return MyArtObject.getByIdWithAvatar(id);
     }

@@ -19,6 +19,8 @@ export default class ReportModel extends PgObject {
         required: true
       },
       filters: {},
+      // общая комиссия галереи, % (см. ReportService)
+      commission_pct: {},
       ctime: {
         default: new Date()
       },

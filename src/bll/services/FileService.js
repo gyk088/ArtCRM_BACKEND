@@ -5,6 +5,8 @@ import util from 'util';
 import { pipeline } from 'stream'
 import { fileExt, cutStr } from '../utils/helpers.js';
 import { sharingScopeUserIds } from '../utils/userAccess.js';
+import ArtService from './ArtService.js';
+import { makeThumb, removeThumb } from '../utils/thumbs.js';
 
 const pump = util.promisify(pipeline)
 
@@ -76,6 +78,9 @@ export default class FileService {
     fileObj.f.size = fileStream.bytesRead
     await fileObj.save()
 
+    // превью для списков (для не-картинок ничего не делает)
+    await makeThumb(fileObj.f.id, fileObj.f.ext)
+
     return fileObj;
   }
 
@@ -145,6 +150,8 @@ export default class FileService {
       throw new Error('Source file is missing on disk');
     }
 
+    await makeThumb(fileObj.f.id, fileObj.f.ext);
+
     return fileObj;
   }
 
@@ -174,10 +181,11 @@ export default class FileService {
   static async deleteFile(id, user) {
     try {
       // Получаем файл и проверяем права доступа. Файлы внутри галереи
-      // общие, но удалить файл может только тот, кто его загрузил.
+      // общие; удалить файл может тот, кто его загрузил, или сама галерея
+      // (как работы — AuthorizationService.canDeleteWorkOwner).
       const file = await this.getFileById(id, user);
-      if (file.f.user_id !== user.f.id) {
-        throw new Error('Only the user who uploaded the file can delete it');
+      if (!(await ArtService.__canUseRef(file, user.f.id, { forDelete: true }))) {
+        throw new Error('Only the uploader or the gallery can delete this file');
       }
 
       // Отвязываем файл отовсюду, где он используется — иначе удаление
@@ -196,6 +204,8 @@ export default class FileService {
       } else {
         console.log(`File not found on disk: ${filePath}`);
       }
+
+      removeThumb(file.f.id);
 
       // Удаляем запись из базы данных
       await file.delete();
@@ -418,8 +428,8 @@ export default class FileService {
 
   static async deleteFolder(id, user) {
     const folder = await this.getFolderById(id, user);
-    if (folder.f.user_id !== user.f.id) {
-      throw new Error('Only the user who created the folder can delete it');
+    if (!(await ArtService.__canUseRef(folder, user.f.id, { forDelete: true }))) {
+      throw new Error('Only the creator or the gallery can delete this folder');
     }
 
     await this.__cascadeDeleteFolder(id, user);
@@ -468,11 +478,8 @@ export default class FileService {
     }
 
     const byId = new Map(files.map(f => [f.f.id, f]));
-    for (let i = 0; i < ids.length; i++) {
-      const file = byId.get(ids[i]);
-      file.f.order_num = i;
-      await file.save();
-    }
+    ids.forEach((id, i) => { byId.get(id).f.order_num = i; });
+    await FileModel.updateMany(files); // один UPDATE на все
 
     return ids.map(id => byId.get(id));
   }
@@ -493,11 +500,8 @@ export default class FileService {
     }
 
     const byId = new Map(folders.map(f => [f.f.id, f]));
-    for (let i = 0; i < ids.length; i++) {
-      const folder = byId.get(ids[i]);
-      folder.f.order_num = i;
-      await folder.save();
-    }
+    ids.forEach((id, i) => { byId.get(id).f.order_num = i; });
+    await FileFolderModel.updateMany(folders); // один UPDATE на все
 
     return ids.map(id => byId.get(id));
   }

@@ -9,6 +9,7 @@ export default async function authRoutes(fastify, _options) {
     fastify.post('/forgot-password', AuthController.requestPasswordReset)
     fastify.post('/reset-password', AuthController.resetPassword)
     fastify.post('/change-password', {preHandler: [auth()]}, AuthController.changePassword)
+    fastify.post('/logout', {preHandler: [auth()]}, AuthController.logout)
     fastify.get('/sessions', {preHandler: [auth()]}, AuthController.getSessions)
     fastify.post('/sessions/revoke', {preHandler: [auth()]}, AuthController.revokeSession)
     fastify.post('/sessions/revoke-others', {preHandler: [auth()]}, AuthController.revokeOtherSessions)

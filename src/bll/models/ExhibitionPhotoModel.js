@@ -1,5 +1,6 @@
 import { PgObject } from 'pgobject';
 import { getFileBaseUrl } from '../utils/const.js';
+import { thumbUrl } from '../utils/thumbs.js';
 
 export default class ExhibitionPhotoModel extends PgObject {
   static get schema() {
@@ -65,15 +66,13 @@ export default class ExhibitionPhotoModel extends PgObject {
     return result.rows.map(row => ({
       id: row.id,
       caption: row.caption,
-      file: { id: row.f_id, ext: row.f_ext, name: row.f_name, url: `${getFileBaseUrl()}/${row.f_id}.${row.f_ext}` }
+      file: { id: row.f_id, ext: row.f_ext, name: row.f_name, url: `${getFileBaseUrl()}/${row.f_id}.${row.f_ext}`, thumb_url: thumbUrl(row.f_id, row.f_ext) }
     }));
   }
 
   static async removeAllForExhibition(exhibitionId) {
-    const rows = await ExhibitionPhotoModel.select('WHERE exhibition_id = $1', [exhibitionId]);
-    for (const row of rows) {
-      await row.delete();
-    }
-    return { success: true, deleted: rows.length };
+    // один запрос вместо загрузки и удаления строк по одной
+    const result = await PgObject.query(`DELETE FROM ${ExhibitionPhotoModel.table} WHERE exhibition_id = $1`, [exhibitionId]);
+    return { success: true, deleted: result.rowCount };
   }
 }

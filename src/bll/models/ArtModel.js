@@ -1,5 +1,6 @@
 import { PgObject } from 'pgobject';
 import { getFileBaseUrl, CURRENCIES } from '../utils/const.js';
+import { thumbUrl } from '../utils/thumbs.js';
 
 export default class MyArtObject extends PgObject {
   static get schema() {
@@ -107,6 +108,7 @@ export default class MyArtObject extends PgObject {
   static async getAllWithAvatar(userId, gallerySharingScopeId = null) {
     const query = `
       SELECT ao.*, f.id as f_id, f.ext as f_ext, f.name as f_name,
+        ARRAY(SELECT aot.tag_id::text FROM my_art_object_tag aot WHERE aot.art_id = ao.id) as tags,
         creator.name as creator_name, creator.surname as creator_surname,
         editor.name as editor_name, editor.surname as editor_surname,
         sale.id as sale_id, sale.sale_date as sale_date,
@@ -138,6 +140,7 @@ export default class MyArtObject extends PgObject {
    *   year, year_from, year_to, price_min, price_max   — числа/диапазоны
    *   name        — подстрока в названии (без учёта регистра)
    *   imported    — 'true' / 'false'
+   *   tags        — id тегов через запятую (хотя бы один из них)
    *   sold        — 'true' (проданные) / 'false' (в наличии)
    *
    * @param {object} filters - request.query
@@ -169,6 +172,14 @@ export default class MyArtObject extends PgObject {
     if (has('price_min')) conditions.push(`ao.price >= ${addParam(toNumber('price_min'))}`);
     if (has('price_max')) conditions.push(`ao.price <= ${addParam(toNumber('price_max'))}`);
     if (has('name')) conditions.push(`ao.name ILIKE ${addParam(`%${String(filters.name)}%`)}`);
+    // tags — id тегов через запятую: работы, у которых есть хотя бы один из них
+    if (has('tags')) {
+      const tagIds = String(filters.tags).split(',').map(t => t.trim()).filter(Boolean);
+      if (tagIds.some(t => !/^[0-9a-f-]{36}$/i.test(t))) throw new Error('Invalid filter value: tags');
+      if (tagIds.length) {
+        conditions.push(`EXISTS (SELECT 1 FROM my_art_object_tag aot WHERE aot.art_id = ao.id AND aot.tag_id = ANY(${addParam(tagIds)}::uuid[]))`);
+      }
+    }
     if (has('sold')) {
       if (!['true', 'false'].includes(String(filters.sold))) throw new Error('Invalid filter value: sold');
       conditions.push(String(filters.sold) === 'true' ? 'sale.id IS NOT NULL' : 'sale.id IS NULL');
@@ -180,6 +191,7 @@ export default class MyArtObject extends PgObject {
 
     const query = `
       SELECT ao.*, f.id as f_id, f.ext as f_ext, f.name as f_name,
+        ARRAY(SELECT aot.tag_id::text FROM my_art_object_tag aot WHERE aot.art_id = ao.id) as tags,
         creator.name as creator_name, creator.surname as creator_surname,
         editor.name as editor_name, editor.surname as editor_surname,
         sale.id as sale_id, sale.sale_date as sale_date,
@@ -212,6 +224,7 @@ export default class MyArtObject extends PgObject {
   static async getByIdWithAvatar(id) {
     const query = `
       SELECT ao.*, f.id as f_id, f.ext as f_ext, f.name as f_name,
+        ARRAY(SELECT aot.tag_id::text FROM my_art_object_tag aot WHERE aot.art_id = ao.id) as tags,
         creator.name as creator_name, creator.surname as creator_surname,
         editor.name as editor_name, editor.surname as editor_surname,
         sale.id as sale_id, sale.sale_date as sale_date,
@@ -233,7 +246,7 @@ export default class MyArtObject extends PgObject {
     const { f_id, f_ext, f_name, ...rest } = row;
     return {
       ...rest,
-      avatar: f_id ? { id: f_id, ext: f_ext, name: f_name, url: `${getFileBaseUrl()}/${f_id}.${f_ext}` } : null
+      avatar: f_id ? { id: f_id, ext: f_ext, name: f_name, url: `${getFileBaseUrl()}/${f_id}.${f_ext}`, thumb_url: thumbUrl(f_id, f_ext) } : null
     };
   }
 

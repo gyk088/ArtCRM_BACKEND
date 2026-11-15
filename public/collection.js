@@ -217,7 +217,8 @@
       btn.className = 'thumb-btn' + (idx === activeImageIndex ? ' active' : '');
       btn.type = 'button';
       var img = document.createElement('img');
-      img.src = thumb.url;
+      img.src = thumb.thumb_url || thumb.url;
+      img.onerror = function () { if (img.src !== thumb.url) img.src = thumb.url; };
       img.alt = (workAt(activeIndex).name || '') + ' ' + (idx + 1);
       btn.appendChild(img);
       btn.addEventListener('click', function () {

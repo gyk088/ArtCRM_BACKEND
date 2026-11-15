@@ -88,6 +88,19 @@ export default class AuthController {
         }
     }
 
+    // Выход: завершаем текущую сессию, чтобы токен перестал работать
+    // (раньше фронтенд вызывал этот маршрут, а его не было — 404, и токен
+    // оставался действующим после выхода)
+    static async logout(request, reply) {
+        try {
+            const currentToken = request.headers?.authorization?.replace('Bearer ', '');
+            await AuthService.revokeSession(request.user.f.id, currentToken);
+            return { success: true }
+        } catch (error) {
+            reply.code(400).send({ error: error.message })
+        }
+    }
+
     static async revokeOtherSessions(request, reply) {
         try {
             const currentToken = request.headers?.authorization?.replace('Bearer ', '');

@@ -41,6 +41,14 @@ export default async function artRoutes(fastify, _options) {
     fastify.delete('/statuses/:id', {preHandler: [auth()]}, ArtController.deleteStatus);
     
     // Location routes
+    // Теги работ (справочник, у работы может быть несколько тегов)
+    fastify.post('/tags', {preHandler: [auth()]}, ArtController.createTag);
+    fastify.get('/tags', {preHandler: [auth()]}, ArtController.getAllTags);
+    fastify.get('/tags/user/:userId', {preHandler: [auth()]}, ArtController.getTagByUserId);
+    fastify.get('/tags/:id', {preHandler: [auth()]}, ArtController.getTagById);
+    fastify.put('/tags', {preHandler: [auth()]}, ArtController.updateTag);
+    fastify.delete('/tags/:id', {preHandler: [auth()]}, ArtController.deleteTag);
+
     fastify.post('/locations', {preHandler: [auth()]}, ArtController.createLocation);
     fastify.get('/locations', {preHandler: [auth()]}, ArtController.getAllLocations);
     fastify.get('/locations/user/:userId', {preHandler: [auth()]}, ArtController.getLocationByUserId);
@@ -65,4 +73,6 @@ export default async function artRoutes(fastify, _options) {
     // Bulk operations
     fastify.post('/art-objects/bulk', {preHandler: [auth()]}, ArtController.bulkCreateArtObjects);
     fastify.post('/art-objects/bulk-delete', {preHandler: [auth()]}, ArtController.bulkDeleteArtObjects);
+    // Массовое изменение выбранных работ (справочники, теги, цена в %)
+    fastify.post('/art-objects/bulk-update', {preHandler: [auth()]}, ArtController.bulkUpdateArtObjects);
 }

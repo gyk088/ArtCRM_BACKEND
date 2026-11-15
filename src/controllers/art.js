@@ -266,6 +266,56 @@ export default class ArtController {
         }
     }
 
+    // ============= TAG CONTROLLERS =============
+
+    static async createTag(request, reply) {
+        try {
+            return await ArtService.createTag(request.body, request.user.f.id);
+        } catch (error) {
+            reply.code(400).send({ error: error.message });
+        }
+    }
+
+    static async getTagById(request, reply) {
+        try {
+            return await ArtService.getTagById(request.params.id, request.user.f.id);
+        } catch (error) {
+            reply.code(404).send({ error: error.message });
+        }
+    }
+
+    static async getAllTags(request, reply) {
+        try {
+            return await ArtService.getAllTags(request.user.f.id);
+        } catch (error) {
+            reply.code(400).send({ error: error.message });
+        }
+    }
+
+    static async getTagByUserId(request, reply) {
+        try {
+            return await ArtService.getTagByUserId(request.params.userId, request.user);
+        } catch (error) {
+            reply.code(400).send({ error: error.message });
+        }
+    }
+
+    static async updateTag(request, reply) {
+        try {
+            return await ArtService.updateTag(request.body, request.user.f.id);
+        } catch (error) {
+            reply.code(400).send({ error: error.message });
+        }
+    }
+
+    static async deleteTag(request, reply) {
+        try {
+            return await ArtService.deleteTag(request.params.id, request.user.f.id);
+        } catch (error) {
+            reply.code(400).send({ error: error.message });
+        }
+    }
+
     // ============= LOCATION CONTROLLERS =============
 
     static async createLocation(request, reply) {
@@ -466,6 +516,15 @@ export default class ArtController {
                 return;
             }
             return await ArtService.bulkDeleteArtObjects(ids, request.user);
+        } catch (error) {
+            reply.code(400).send({ error: error.message });
+        }
+    }
+
+    static async bulkUpdateArtObjects(request, reply) {
+        try {
+            const { ids, changes } = request.body || {};
+            return await ArtService.bulkUpdateArtObjects(ids, changes, request.user);
         } catch (error) {
             reply.code(400).send({ error: error.message });
         }

@@ -236,11 +236,8 @@ export default class ExhibitionService {
         }
 
         const byId = new Map(photos.map(p => [p.f.id, p]));
-        for (let i = 0; i < ids.length; i++) {
-            const photo = byId.get(ids[i]);
-            photo.f.order_num = i;
-            await photo.save();
-        }
+        ids.forEach((id, i) => { byId.get(id).f.order_num = i; });
+        await ExhibitionPhotoModel.updateMany(photos); // один UPDATE на все
 
         return ExhibitionPhotoModel.getResolvedByExhibitionId(exhibitionId);
     }

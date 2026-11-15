@@ -4,12 +4,14 @@ import UserModel from '../models/UserModel.js';
 import AuthorizationService from './AuthorizationService.js';
 import { toPerson } from '../utils/userAccess.js';
 import { CURRENCIES, getFileBaseUrl } from '../utils/const.js';
+import { thumbUrl } from '../utils/thumbs.js';
 
 const REPORT_TYPES = ['sales'];
 const MAX_NAME_LENGTH = 200;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DISCOUNT_MODES = ['any', 'none', 'with'];
+const ARTIST_PAID_MODES = ['any', 'paid', 'unpaid'];
 
 const round2 = (n) => Math.round(n * 100) / 100;
 const toNum = (v) => (v === null || v === undefined ? null : Number(v));
@@ -105,6 +107,8 @@ export default class ReportService {
         }
         const discount = f.discount === undefined || f.discount === null || f.discount === '' ? 'any' : f.discount;
         if (!DISCOUNT_MODES.includes(discount)) throw new Error('Invalid filter discount');
+        const artistPaid = f.artist_paid === undefined || f.artist_paid === null || f.artist_paid === '' ? 'any' : f.artist_paid;
+        if (!ARTIST_PAID_MODES.includes(artistPaid)) throw new Error('Invalid filter artist_paid');
 
         const out = {
             date_from: date('date_from'),
@@ -118,6 +122,8 @@ export default class ReportService {
             discount,
             discount_min: num('discount_min', { min: -1000, max: 100 }),
             discount_max: num('discount_max', { min: -1000, max: 100 }),
+            // расчёт с художником: any | paid | unpaid
+            artist_paid: artistPaid,
             price_min: num('price_min', { min: 0 }),
             price_max: num('price_max', { min: 0 }),
         };
@@ -140,6 +146,59 @@ export default class ReportService {
             out[currency] = n;
         }
         return out;
+    }
+
+    // ============= КОМИССИЯ =============
+
+    /** Общая комиссия отчёта: null (не задана) или 0..100 */
+    static __normalizeCommission(value) {
+        if (value === undefined || value === null || value === '') return null;
+        const n = Number(value);
+        if (!Number.isFinite(n) || n < 0 || n > 100) throw new Error('commission_pct must be between 0 and 100');
+        return round2(n);
+    }
+
+    /**
+     * Изменения индивидуальных комиссий: { [sale_id]: pct | null } —
+     * null убирает индивидуальную комиссию (продажа снова считается по общей).
+     * Остальные индивидуальные комиссии отчёта не трогаем.
+     */
+    static async __normalizeCommissionOverrides(raw) {
+        if (raw === undefined || raw === null) return {};
+        if (typeof raw !== 'object' || Array.isArray(raw)) throw new Error('commission_overrides must be an object');
+        const out = {};
+        for (const [saleId, value] of Object.entries(raw)) {
+            if (!UUID_RE.test(saleId)) throw new Error('Invalid sale id in commission_overrides');
+            out[saleId] = ReportService.__normalizeCommission(value);
+        }
+        const ids = Object.keys(out).filter(id => out[id] !== null);
+        if (ids.length) {
+            const found = await PgObject.query('SELECT id FROM my_sale WHERE id = ANY($1::uuid[])', [ids]);
+            if (found.rows.length !== ids.length) throw new Error('Sale not found');
+        }
+        return out;
+    }
+
+    static async __getCommissionOverrides(reportId) {
+        const result = await PgObject.query(
+            'SELECT sale_id, commission_pct FROM my_report_commission WHERE report_id = $1', [reportId]
+        );
+        const out = {};
+        for (const row of result.rows) out[row.sale_id] = Number(row.commission_pct);
+        return out;
+    }
+
+    static async __applyCommissionOverrides(reportId, overrides) {
+        for (const [saleId, pct] of Object.entries(overrides)) {
+            if (pct === null) {
+                await PgObject.query('DELETE FROM my_report_commission WHERE report_id = $1 AND sale_id = $2', [reportId, saleId]);
+            } else {
+                await PgObject.query(`
+                    INSERT INTO my_report_commission (report_id, sale_id, commission_pct) VALUES ($1, $2, $3)
+                    ON CONFLICT (report_id, sale_id) DO UPDATE SET commission_pct = EXCLUDED.commission_pct
+                `, [reportId, saleId, pct]);
+            }
+        }
     }
 
     // ============= КУРСЫ =============
@@ -203,7 +262,7 @@ export default class ReportService {
 
     // ============= CRUD =============
 
-    static toDto(report, rates, owner = null) {
+    static toDto(report, rates, owner = null, commissionOverrides = {}) {
         return {
             id: report.f.id,
             user_id: report.f.user_id,
@@ -213,6 +272,9 @@ export default class ReportService {
             currency: report.f.currency,
             filters: ReportService.__normalizeFilters(report.f.filters || {}),
             rates: rates || {},
+            commission_pct: toNum(report.f.commission_pct),
+            // индивидуальные комиссии продаж в этом отчёте: { [sale_id]: pct }
+            commission_overrides: commissionOverrides,
             ctime: report.f.ctime,
             utime: report.f.utime,
         };
@@ -221,7 +283,7 @@ export default class ReportService {
     static async list(actorUser) {
         const scope = AuthorizationService.gallerySharingScope(toPerson(actorUser));
         const result = await PgObject.query(`
-            SELECT r.id, r.user_id, r.name, r.type, r.currency, r.filters, r.ctime, r.utime,
+            SELECT r.id, r.user_id, r.name, r.type, r.currency, r.filters, r.commission_pct, r.ctime, r.utime,
                 u.name AS owner_name, u.surname AS owner_surname
             FROM my_report r
             LEFT JOIN my_user u ON u.id = r.user_id
@@ -236,6 +298,7 @@ export default class ReportService {
             type: row.type,
             currency: row.currency,
             filters: row.filters || {},
+            commission_pct: toNum(row.commission_pct),
             ctime: row.ctime,
             utime: row.utime,
         }));
@@ -243,7 +306,16 @@ export default class ReportService {
 
     static async get(id, actorUser) {
         const report = await ReportService.__getAccessible(id, actorUser);
-        return ReportService.toDto(report, await ReportService.__getRates(report.f.id));
+        return ReportService.__fullDto(report);
+    }
+
+    static async __fullDto(report) {
+        return ReportService.toDto(
+            report,
+            await ReportService.__getRates(report.f.id),
+            null,
+            await ReportService.__getCommissionOverrides(report.f.id)
+        );
     }
 
     /**
@@ -258,6 +330,7 @@ export default class ReportService {
         const currency = ReportService.__normalizeCurrency(data?.currency);
         const name = ReportService.__normalizeName(data?.name);
         const filters = ReportService.__normalizeFilters(data?.filters);
+        const commissionPct = ReportService.__normalizeCommission(data?.commission_pct);
         const rates = data?.rates !== undefined
             ? ReportService.__normalizeRates(data.rates, currency)
             : (await ReportService.getSuggestedRates(currency, actorUser)).rates;
@@ -268,17 +341,19 @@ export default class ReportService {
             type,
             currency,
             filters,
+            commission_pct: commissionPct,
             ctime: new Date(),
             utime: new Date(),
         });
         await report.save();
         await ReportService.__setRates(report.f.id, rates);
 
-        return ReportService.toDto(report, await ReportService.__getRates(report.f.id));
+        return ReportService.__fullDto(report);
     }
 
     /**
-     * Изменить отчёт: name, currency, filters, rates — любые из них.
+     * Изменить отчёт: name, currency, filters, rates, commission_pct,
+     * commission_overrides — любые из них.
      * При смене валюты без явно переданных курсов курсы пересчитываются
      * под новую валюту (convertRates).
      */
@@ -290,6 +365,10 @@ export default class ReportService {
         const name = data.name !== undefined ? ReportService.__normalizeName(data.name) : report.f.name;
         const currency = data.currency !== undefined ? ReportService.__normalizeCurrency(data.currency) : oldCurrency;
         const filters = data.filters !== undefined ? ReportService.__normalizeFilters(data.filters) : report.f.filters;
+        const commissionPct = data.commission_pct !== undefined
+            ? ReportService.__normalizeCommission(data.commission_pct)
+            : toNum(report.f.commission_pct);
+        const overrides = await ReportService.__normalizeCommissionOverrides(data.commission_overrides);
         let rates = null;
         if (data.rates !== undefined) {
             rates = ReportService.__normalizeRates(data.rates, currency);
@@ -301,11 +380,13 @@ export default class ReportService {
         report.f.name = name;
         report.f.currency = currency;
         report.f.filters = filters;
+        report.f.commission_pct = commissionPct;
         report.f.utime = new Date();
         await report.save();
         if (rates !== null) await ReportService.__setRates(report.f.id, rates);
+        await ReportService.__applyCommissionOverrides(report.f.id, overrides);
 
-        return ReportService.toDto(report, await ReportService.__getRates(report.f.id));
+        return ReportService.__fullDto(report);
     }
 
     static async delete(id, actorUser) {
@@ -342,6 +423,7 @@ export default class ReportService {
         const result = await PgObject.query(`
             SELECT s.id, s.art_id, s.sale_date, s.list_price, s.sale_price, s.currency,
                 s.discount_type, s.discount_value, s.comment, s.contact_id, s.sold_by,
+                s.artist_paid, s.artist_paid_at,
                 ao.name AS art_name, ao.year AS art_year, ao.technique AS art_technique, ao.size AS art_size,
                 ao.artist AS artist_id, a.name AS artist_name,
                 ao.seria AS seria_id, se.name AS seria_name,
@@ -369,9 +451,15 @@ export default class ReportService {
      */
     static async compute(id, actorUser) {
         const report = await ReportService.__getAccessible(id, actorUser);
-        const rates = await ReportService.__getRates(report.f.id);
-        const dto = ReportService.toDto(report, rates);
-        const { filters, currency: reportCurrency } = dto;
+        const dto = await ReportService.__fullDto(report);
+        const { filters, currency: reportCurrency, rates } = dto;
+        // Комиссия продажи: индивидуальная в этом отчёте, иначе общая отчёта
+        const commissionFor = (saleId) => {
+            if (dto.commission_overrides[saleId] !== undefined) {
+                return { pct: dto.commission_overrides[saleId], source: 'individual' };
+            }
+            return dto.commission_pct !== null ? { pct: dto.commission_pct, source: 'report' } : { pct: null, source: null };
+        };
         const rateFor = (cur) => (cur === reportCurrency ? 1 : rates[cur] ?? null);
 
         const salesRows = await ReportService.__querySales(filters, actorUser);
@@ -383,6 +471,11 @@ export default class ReportService {
             const rate = rateFor(r.currency);
             const discountPct = listPrice && listPrice > 0 ? round2(((listPrice - salePrice) / listPrice) * 100) : null;
             const converted = rate === null ? null : round2(salePrice * rate);
+            // Комиссия — от цены продажи (после скидки)
+            const commission = commissionFor(r.id);
+            const commissionAmount = commission.pct === null ? null : round2(salePrice * commission.pct / 100);
+            const commissionConverted = converted === null || commission.pct === null
+                ? null : round2(converted * commission.pct / 100);
             return {
                 sale_id: r.id,
                 art_id: r.art_id,
@@ -391,6 +484,7 @@ export default class ReportService {
                 art_technique: r.art_technique,
                 art_size: r.art_size,
                 avatar_url: r.f_id ? `${getFileBaseUrl()}/${r.f_id}.${r.f_ext}` : null,
+                avatar_thumb_url: thumbUrl(r.f_id, r.f_ext),
                 artist: r.artist_id ? { id: r.artist_id, name: r.artist_name } : null,
                 seria: r.seria_id ? { id: r.seria_id, name: r.seria_name } : null,
                 media: r.media_id ? { id: r.media_id, name: r.media_name } : null,
@@ -405,6 +499,15 @@ export default class ReportService {
                 rate,
                 list_price_converted: rate === null || listPrice === null ? null : round2(listPrice * rate),
                 sale_price_converted: converted,
+                artist_paid: !!r.artist_paid,
+                artist_paid_at: r.artist_paid_at ?? null,
+                commission_pct: commission.pct,
+                commission_source: commission.source,
+                commission_amount: commissionAmount,
+                commission_converted: commissionConverted,
+                // художнику = продажа − комиссия (без комиссии — вся сумма)
+                net_amount: round2(salePrice - (commissionAmount || 0)),
+                net_converted: converted === null ? null : round2(converted - (commissionConverted || 0)),
                 contact: r.contact_id ? { id: r.contact_id, name: r.contact_name } : null,
                 sold_by: r.sold_by ? { id: r.sold_by, name: r.sold_by_name, surname: r.sold_by_surname } : null,
                 comment: r.comment,
@@ -412,6 +515,8 @@ export default class ReportService {
         });
 
         // Фильтры по скидке и цене (цена — в валюте отчёта)
+        if (filters.artist_paid === 'paid') rows = rows.filter(r => r.artist_paid);
+        if (filters.artist_paid === 'unpaid') rows = rows.filter(r => !r.artist_paid);
         if (filters.discount === 'none') rows = rows.filter(r => !(r.discount_pct > 0));
         if (filters.discount === 'with') rows = rows.filter(r => r.discount_pct > 0);
         if (filters.discount_min !== null) rows = rows.filter(r => r.discount_pct !== null && r.discount_pct >= filters.discount_min);
@@ -438,16 +543,26 @@ export default class ReportService {
         const totalList = round2(withList.reduce((acc, r) => acc + r.list_price_converted, 0));
         const totalListedSales = round2(withList.reduce((acc, r) => acc + r.sale_price_converted, 0));
         const withDiscount = rows.filter(r => r.discount_pct !== null);
+        const commissionTotal = round2(converted.reduce((acc, r) => acc + (r.commission_converted || 0), 0));
+        const paidTotal = round2(converted.filter(r => r.artist_paid).reduce((acc, r) => acc + r.net_converted, 0));
 
         const group = (keyFn, labelFn) => {
             const map = new Map();
             for (const r of rows) {
                 const key = keyFn(r);
-                if (!map.has(key)) map.set(key, { ...labelFn(r), count: 0, count_without_rate: 0, total: 0 });
+                if (!map.has(key)) {
+                    map.set(key, { ...labelFn(r), count: 0, count_without_rate: 0, total: 0, commission: 0, net: 0, paid: 0 });
+                }
                 const g = map.get(key);
                 g.count++;
-                if (r.sale_price_converted === null) g.count_without_rate++;
-                else g.total = round2(g.total + r.sale_price_converted);
+                if (r.sale_price_converted === null) {
+                    g.count_without_rate++;
+                } else {
+                    g.total = round2(g.total + r.sale_price_converted);
+                    g.commission = round2(g.commission + (r.commission_converted || 0));
+                    g.net = round2(g.net + r.net_converted);
+                    if (r.artist_paid) g.paid = round2(g.paid + r.net_converted);
+                }
             }
             return [...map.values()];
         };
@@ -468,6 +583,14 @@ export default class ReportService {
                 : null,
             // Сколько "отдали" скидками в деньгах (цена работы − продажа) по строкам с ценой работы
             discount_amount: round2(totalList - totalListedSales),
+            // Комиссия галереи и выплаты художникам — по строкам с курсом
+            commission_total: commissionTotal,
+            net_total: round2(total - commissionTotal),
+            // выплачено художникам — их часть по продажам с отметкой «расчёт»
+            paid_total: paidTotal,
+            unpaid_total: round2(round2(total - commissionTotal) - paidTotal),
+            paid_count: rows.filter(r => r.artist_paid).length,
+            individual_commission_count: rows.filter(r => r.commission_source === 'individual').length,
             missing_rates: [...missing.entries()].map(([currency, count]) => ({ currency, count })),
             by_currency: group(r => r.currency, r => ({ currency: r.currency, rate: rateFor(r.currency) }))
                 .map(g => ({

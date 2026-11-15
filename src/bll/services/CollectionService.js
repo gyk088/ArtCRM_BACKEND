@@ -345,11 +345,10 @@ export default class CollectionService {
         }
 
         const byId = new Map(collections.map(c => [c.f.id, c]));
-        for (let i = 0; i < ids.length; i++) {
-            const collection = byId.get(ids[i]);
-            collection.f.order_num = i;
-            await collection.save();
-        }
+        // utime ставим сами: updateMany не вызывает CollectionModel.save()
+        const now = new Date();
+        ids.forEach((id, i) => { const c = byId.get(id); c.f.order_num = i; c.f.utime = now; });
+        await CollectionModel.updateMany(collections); // один UPDATE на все
 
         return ids.map(id => byId.get(id));
     }
@@ -368,11 +367,8 @@ export default class CollectionService {
         }
 
         const byId = new Map(folders.map(f => [f.f.id, f]));
-        for (let i = 0; i < ids.length; i++) {
-            const folder = byId.get(ids[i]);
-            folder.f.order_num = i;
-            await folder.save();
-        }
+        ids.forEach((id, i) => { byId.get(id).f.order_num = i; });
+        await CollectionFolderModel.updateMany(folders); // один UPDATE на все
 
         return ids.map(id => byId.get(id));
     }

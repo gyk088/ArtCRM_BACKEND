@@ -1,5 +1,6 @@
 import { PgObject } from 'pgobject';
 import { getFileBaseUrl } from '../utils/const.js';
+import { thumbUrl } from '../utils/thumbs.js';
 
 // Владелец(ы): один id или список (общие папки галереи)
 const toIds = (userId) => (Array.isArray(userId) ? userId : [userId]);
@@ -30,7 +31,7 @@ export default class MyFileFolder extends PgObject {
     const { f_id, f_ext, f_name, ...rest } = row;
     return {
       ...rest,
-      avatar: f_id ? { id: f_id, ext: f_ext, name: f_name, url: `${getFileBaseUrl()}/${f_id}.${f_ext}` } : null
+      avatar: f_id ? { id: f_id, ext: f_ext, name: f_name, url: `${getFileBaseUrl()}/${f_id}.${f_ext}`, thumb_url: thumbUrl(f_id, f_ext) } : null
     };
   }
 

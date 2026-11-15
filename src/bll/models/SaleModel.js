@@ -28,6 +28,10 @@ export default class SaleModel extends PgObject {
       commission_pct: {},
       discount_type: {},
       discount_value: {},
+      // расчёт с художником: выплачена ли его часть, когда и кто отметил
+      artist_paid: { default: false },
+      artist_paid_at: {},
+      artist_paid_by: {},
       ctime: {
         default: new Date()
       },
