@@ -498,9 +498,9 @@ async function runFilesBackup(target, userIds, actor, token) {
         await NotificationService.notify({
             userId: actor.f.id, type: 'backup_ready', title: 'Бекап файлов готов',
             body: actor.f.id === targetId
-                ? 'Архив можно скачать в профиле в течение 24 часов'
+                ? 'Архив можно скачать в разделе «Бекап» в течение 24 часов'
                 : `Архив файлов «${personName(target.f)}» можно скачать в админ-панели в течение 24 часов`,
-            link: actor.f.id === targetId ? '/home/profile' : '/home/admin', allowSelf: true,
+            link: actor.f.id === targetId ? '/home/backup' : '/home/admin', allowSelf: true,
         });
     } catch (err) {
         console.error('[backup] files backup failed:', err);
@@ -508,7 +508,7 @@ async function runFilesBackup(target, userIds, actor, token) {
         writeMeta(targetId, { ...readMeta(targetId), status: 'failed', error: err.message, finishedAt: new Date().toISOString() });
         await NotificationService.notify({
             userId: actor.f.id, type: 'backup_failed', title: 'Не удалось сделать бекап файлов',
-            body: err.message, link: actor.f.id === targetId ? '/home/profile' : '/home/admin', allowSelf: true,
+            body: err.message, link: actor.f.id === targetId ? '/home/backup' : '/home/admin', allowSelf: true,
         });
     } finally {
         running.delete(targetId);

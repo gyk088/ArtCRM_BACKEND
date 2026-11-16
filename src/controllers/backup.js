@@ -41,7 +41,7 @@ export default class BackupController {
     static async download(request, reply) {
         const found = BackupService.findDownload(request.params.token);
         if (!found) {
-            reply.code(404).type('text/plain; charset=utf-8').send('Ссылка на бекап устарела или неверна. Сделайте бекап заново в профиле.');
+            reply.code(404).type('text/plain; charset=utf-8').send('Ссылка на бекап устарела или неверна. Сделайте бекап заново в разделе «Бекап».');
             return;
         }
         reply
