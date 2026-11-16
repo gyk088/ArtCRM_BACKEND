@@ -15,6 +15,8 @@ import reportRoutes from './routes/v1/report/index.js'
 import noteRoutes from './routes/v1/note/index.js'
 import taskRoutes from './routes/v1/task/index.js'
 import notificationRoutes from './routes/v1/notification/index.js'
+import backupRoutes from './routes/v1/backup/index.js'
+import BackupService from './bll/services/BackupService.js'
 import { BiographyService, CvService } from './bll/services/TextDocumentService.js'
 import AuditLogModel from './bll/models/AuditLogModel.js'
 
@@ -49,6 +51,8 @@ fastify.register(fastifyMultipart, {
 await fastify.register(cors, {
   origin: true, // Разрешить все источники (для разработки)
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  // имя скачиваемого файла (бекап, отчёт) — чтобы фронтенд мог его прочитать
+  exposedHeaders: ['Content-Disposition'],
 })
 
 // регистрируем static
@@ -86,6 +90,7 @@ fastify.register(reportRoutes, { prefix: '/api/v1/reports' })
 fastify.register(noteRoutes, { prefix: '/api/v1/notes' })
 fastify.register(taskRoutes, { prefix: '/api/v1/tasks' })
 fastify.register(notificationRoutes, { prefix: '/api/v1/notifications' })
+fastify.register(backupRoutes, { prefix: '/api/v1/backup' })
 fastify.register(publicPageRoutes)
 
 // Аудит-лог всех мутирующих запросов, сделанных во время имперсонации —
@@ -132,6 +137,10 @@ function connectToDatabase() {
 const start = async () => {
   try {
     connectToDatabase();
+    // Бекапы: прерванные рестартом — пометить неудавшимися, просроченные
+    // (старше 24 часов) — удалять раз в час
+    BackupService.cleanup({ onStart: true });
+    setInterval(() => BackupService.cleanup(), 60 * 60 * 1000).unref();
     // FASTIFY_HOST=127.0.0.1 — принимать соединения только от nginx (с этой же
     // машины), а не напрямую из интернета в обход nginx
     await fastify.listen({ port: process.env.FASTIFY_PORT, host: process.env.FASTIFY_HOST || '0.0.0.0' })

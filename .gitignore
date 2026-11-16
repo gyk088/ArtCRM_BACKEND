@@ -137,3 +137,6 @@ jspm_packages/
 *.log
 
 files_2026-11-06.tar.gz
+
+# Пользовательские бекапы (архивы файлов, живут 24 часа) — см. BackupService
+/backups/

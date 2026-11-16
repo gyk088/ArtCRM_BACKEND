@@ -12,8 +12,10 @@ export default class NotificationService {
      * Создать уведомление. Ошибка уведомления не должна ломать основное
      * действие (например, создание задачи) — поэтому только логируем.
      */
-    static async notify({ userId, type, title, body = null, link = null, actorId = null }) {
-        if (!userId || userId === actorId) return null; // себе не уведомляем
+    static async notify({ userId, type, title, body = null, link = null, actorId = null, allowSelf = false }) {
+        // себе не уведомляем — кроме системных событий о собственных
+        // действиях пользователя (например, «бекап готов», allowSelf)
+        if (!userId || (userId === actorId && !allowSelf)) return null;
         try {
             const result = await PgObject.query(`
                 INSERT INTO my_notification (user_id, type, title, body, link, actor_id)
