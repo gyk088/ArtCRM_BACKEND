@@ -423,9 +423,9 @@ export default class ReportService {
         const result = await PgObject.query(`
             SELECT s.id, s.art_id, s.sale_date, s.list_price, s.sale_price, s.currency,
                 s.discount_type, s.discount_value, s.comment, s.contact_id, s.sold_by,
-                s.artist_paid, s.artist_paid_at,
+                s.artist_paid, s.artist_paid_at, s.commission_pct AS sale_commission_pct,
                 ao.name AS art_name, ao.year AS art_year, ao.technique AS art_technique, ao.size AS art_size,
-                ao.artist AS artist_id, a.name AS artist_name,
+                ao.artist AS artist_id, a.name AS artist_name, a.commission_pct AS artist_commission_pct,
                 ao.seria AS seria_id, se.name AS seria_name,
                 ao.media AS media_id, m.name AS media_name,
                 f.id AS f_id, f.ext AS f_ext,
@@ -453,11 +453,16 @@ export default class ReportService {
         const report = await ReportService.__getAccessible(id, actorUser);
         const dto = await ReportService.__fullDto(report);
         const { filters, currency: reportCurrency, rates } = dto;
-        // Комиссия продажи: индивидуальная в этом отчёте, иначе общая отчёта
-        const commissionFor = (saleId) => {
+        // Комиссия продажи: индивидуальная в этом отчёте, иначе комиссия
+        // художника по умолчанию (анкета в «Мои художники»), иначе общая отчёта
+        // Порядок: индивидуальная в этом отчёте → своя у продажи (задаётся в
+        // карточке художника) → комиссия художника из анкеты → общая отчёта
+        const commissionFor = (saleId, artistPct, salePct) => {
             if (dto.commission_overrides[saleId] !== undefined) {
                 return { pct: dto.commission_overrides[saleId], source: 'individual' };
             }
+            if (salePct !== null && salePct !== undefined) return { pct: Number(salePct), source: 'sale' };
+            if (artistPct !== null && artistPct !== undefined) return { pct: Number(artistPct), source: 'artist' };
             return dto.commission_pct !== null ? { pct: dto.commission_pct, source: 'report' } : { pct: null, source: null };
         };
         const rateFor = (cur) => (cur === reportCurrency ? 1 : rates[cur] ?? null);
@@ -472,7 +477,7 @@ export default class ReportService {
             const discountPct = listPrice && listPrice > 0 ? round2(((listPrice - salePrice) / listPrice) * 100) : null;
             const converted = rate === null ? null : round2(salePrice * rate);
             // Комиссия — от цены продажи (после скидки)
-            const commission = commissionFor(r.id);
+            const commission = commissionFor(r.id, r.artist_commission_pct, r.sale_commission_pct);
             const commissionAmount = commission.pct === null ? null : round2(salePrice * commission.pct / 100);
             const commissionConverted = converted === null || commission.pct === null
                 ? null : round2(converted * commission.pct / 100);

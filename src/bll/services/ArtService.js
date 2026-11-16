@@ -376,8 +376,12 @@ export default class ArtService {
             await QuotaService.assertCanAddCatalogArtist(poolGalleryId);
         }
 
+        const profile = await ArtService.__normalizeArtistProfile(artistData || {}, actorUser.f.id);
+        const name = ArtService.__artistText(artistData?.name, 'name', 300);
+        if (!name) throw new Error('Artist name is required');
         const artist = new MyArtist({
-            ...artistData,
+            ...profile,
+            name,
             user_id: actorUser.f.id
         });
 
@@ -410,10 +414,63 @@ export default class ArtService {
             throw new Error('Artist not found');
         }
 
-        artist.f.name = artistData.name !== undefined ? artistData.name : artist.f.name;
+        if (artistData.name !== undefined) {
+            const name = ArtService.__artistText(artistData.name, 'name', 300);
+            if (!name) throw new Error('Artist name is required');
+            artist.f.name = name;
+        }
+        Object.assign(artist.f, await ArtService.__normalizeArtistProfile(artistData, userId));
 
         await artist.save();
         return artist;
+    }
+
+    static __artistText(value, field, max) {
+        if (value === undefined || value === null) return null;
+        if (typeof value !== 'string' && typeof value !== 'number') throw new Error(`Artist ${field} must be a string`);
+        const v = String(value).trim();
+        if (v.length > max) throw new Error(`Artist ${field} too long (max ${max})`);
+        return v || null;
+    }
+
+    /**
+     * Поля анкеты художника (step 46) — только переданные. Пустая строка/null
+     * очищает поле. Фото — файл, доступный пользователю (свой или галереи).
+     */
+    static async __normalizeArtistProfile(data, userId) {
+        const out = {};
+        const has = (k) => data[k] !== undefined;
+        for (const [field, max] of [['phone', 100], ['email', 200], ['messenger', 200], ['city', 200], ['bio', 5000]]) {
+            if (has(field)) out[field] = ArtService.__artistText(data[field], field, max);
+        }
+        if (has('birth_year')) {
+            if (data.birth_year === null || data.birth_year === '') out.birth_year = null;
+            else {
+                const y = Number(data.birth_year);
+                if (!Number.isInteger(y) || y < 1000 || y > 2100) throw new Error('Artist birth_year must be a year');
+                out.birth_year = y;
+            }
+        }
+        if (has('commission_pct')) {
+            if (data.commission_pct === null || data.commission_pct === '') out.commission_pct = null;
+            else {
+                const n = Number(data.commission_pct);
+                if (!Number.isFinite(n) || n < 0 || n > 100) throw new Error('commission_pct must be between 0 and 100');
+                out.commission_pct = Math.round(n * 100) / 100;
+            }
+        }
+        if (has('avatar_id')) {
+            if (data.avatar_id === null || data.avatar_id === '') out.avatar_id = null;
+            else {
+                const scope = await ArtService.__refScopeUserIds(userId);
+                const rows = (await PgObject.query(
+                    'SELECT id FROM my_file WHERE id = $1::uuid AND user_id = ANY($2::uuid[])', [String(data.avatar_id), scope]
+                ).catch(() => ({ rows: [] }))).rows;
+                if (!rows.length) throw new Error('File not found');
+                out.avatar_id = rows[0].id;
+            }
+        }
+        return out;
     }
 
     static async deleteArtist(id, userId) {

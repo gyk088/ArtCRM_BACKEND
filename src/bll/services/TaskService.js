@@ -1,6 +1,7 @@
 import { PgObject } from 'pgobject';
 import { TaskStatusModel, TaskBoardModel, TaskModel } from '../models/TaskModels.js';
 import ArtService from './ArtService.js';
+import MyArtist from '../models/ArtistModel.js';
 import NotificationService from './NotificationService.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -269,12 +270,14 @@ export default class TaskService {
             SELECT t.*, s.is_final AS status_is_final,
                 c.name AS creator_name, c.surname AS creator_surname,
                 e.name AS editor_name, e.surname AS editor_surname,
-                a.name AS assignee_name, a.surname AS assignee_surname
+                a.name AS assignee_name, a.surname AS assignee_surname,
+                ar.name AS artist_name
             FROM my_task t
             JOIN my_task_status s ON s.id = t.status_id
             LEFT JOIN my_user c ON c.id = t.user_id
             LEFT JOIN my_user e ON e.id = t.updated_by
             LEFT JOIN my_user a ON a.id = t.assignee_id
+            LEFT JOIN my_artist ar ON ar.id = t.artist_id
             WHERE ${where}
         `;
     }
@@ -288,6 +291,7 @@ export default class TaskService {
             status_id: r.status_id,
             is_closed: !!r.status_is_final,
             assignee: personRow(r.assignee_id, r.assignee_name, r.assignee_surname),
+            artist: r.artist_id ? { id: r.artist_id, name: r.artist_name ?? null } : null,
             due_date: r.due_date,
             priority: r.priority,
             order_num: r.order_num,
@@ -340,6 +344,17 @@ export default class TaskService {
                 out.assignee_id = String(data.assignee_id);
             }
         }
+        // художник — свой или из справочника галереи (как у заметок)
+        if (has('artist_id')) {
+            if (data.artist_id === null || data.artist_id === '') {
+                out.artist_id = null;
+            } else {
+                let artist = null;
+                if (UUID_RE.test(String(data.artist_id))) artist = await MyArtist.getById(String(data.artist_id));
+                if (!(await ArtService.__canUseRef(artist, actorUser.f.id))) throw new Error('Artist not found');
+                out.artist_id = artist.f.id;
+            }
+        }
         if (has('due_date')) {
             if (data.due_date === null || data.due_date === '') out.due_date = null;
             else if (typeof data.due_date !== 'string' || !DATE_RE.test(data.due_date)
@@ -384,6 +399,7 @@ export default class TaskService {
             title: fields.title,
             description: fields.description ?? null,
             assignee_id: fields.assignee_id ?? null,
+            artist_id: fields.artist_id ?? null,
             due_date: fields.due_date ?? null,
             priority: fields.priority || 'normal',
             order_num: maxOrder + 1,
@@ -419,7 +435,7 @@ export default class TaskService {
         if (fields.status) await TaskService.__assertStatusOnBoard(task.f.board_id, fields.status.f.id);
         const prevAssignee = task.f.assignee_id;
 
-        for (const key of ['title', 'description', 'assignee_id', 'due_date', 'priority']) {
+        for (const key of ['title', 'description', 'assignee_id', 'artist_id', 'due_date', 'priority']) {
             if (fields[key] !== undefined) task.f[key] = fields[key];
         }
         if (fields.status && fields.status.f.id !== task.f.status_id) {

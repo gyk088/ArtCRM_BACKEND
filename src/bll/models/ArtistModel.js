@@ -7,7 +7,17 @@ export default class MyArtist extends PgObject {
         pk: true
       },
       user_id: {},
-      name: {}
+      name: {},
+      // анкета художника (раздел «Мои художники», step 46)
+      avatar_id: {},
+      phone: {},
+      email: {},
+      messenger: {},
+      city: {},
+      birth_year: {},
+      bio: {},
+      // комиссия галереи по умолчанию для продаж работ художника, % (см. ReportService.compute)
+      commission_pct: {}
     }
   }
 

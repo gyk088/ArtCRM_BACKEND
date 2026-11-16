@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= p.title %> — портфолио</title>
+  <meta name="description" content="<%= ogDescription %>" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="<%= p.title %> — портфолио" />
+  <meta property="og:description" content="<%= ogDescription %>" />
+  <meta property="og:url" content="<%= pageUrl %>" />
+  <% if (ogImage) { %><meta property="og:image" content="<%= ogImage %>" /><% } %>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/portfolio.css" />
+</head>
+<body>
+  <!-- Обложка -->
+  <header class="pf-cover<%= p.cover ? '' : ' pf-cover-plain' %>">
+    <% if (p.cover) { %><img class="pf-cover-img" src="<%= p.cover.url %>" alt="<%= p.title %>" /><% } %>
+    <div class="pf-cover-text">
+      <h1 class="pf-name"><%= p.title %></h1>
+      <% if (p.subtitle) { %><div class="pf-subtitle"><%= p.subtitle %></div><% } %>
+    </div>
+  </header>
+
+  <main class="pf-main">
+    <!-- О художнике -->
+    <% if (p.bio || p.bio_photo) { %>
+    <section class="pf-about<%= p.bio_photo ? '' : ' pf-about-single' %>">
+      <div class="pf-about-text">
+        <h2 class="pf-h2"><%= p.title %></h2>
+        <% if (p.subtitle) { %><div class="pf-about-sub"><%= p.subtitle %></div><% } %>
+        <% paragraphs(p.bio).forEach(function (t) { %><p><%= t %></p><% }) %>
+      </div>
+      <% if (p.bio_photo) { %>
+      <figure class="pf-about-photo"><a href="<%= p.bio_photo.url %>" target="_blank" rel="noopener"><img src="<%= p.bio_photo.url %>" alt="" loading="lazy" /></a></figure>
+      <% } %>
+    </section>
+    <% } %>
+
+    <!-- Выставки -->
+    <% if (solo.length || group.length) { %>
+    <section class="pf-exhibitions">
+      <% [['Персональные выставки', solo], ['Групповые выставки', group]].forEach(function (pair) { if (!pair[1].length) return; %>
+      <div class="pf-ex-block">
+        <h2 class="pf-h2"><%= pair[0] %></h2>
+        <ul class="pf-ex-list">
+          <% pair[1].forEach(function (l) { %>
+          <li><span class="pf-ex-year"><%= l.year %></span><span class="pf-ex-text"><%= l.text %></span></li>
+          <% }) %>
+        </ul>
+      </div>
+      <% }) %>
+    </section>
+    <% } %>
+
+    <!-- Проекты -->
+    <% p.sections.forEach(function (s) { %>
+    <section class="pf-section">
+      <div class="pf-section-head">
+        <% if (s.year) { %><span class="pf-section-year"><%= s.year %></span><% } %>
+        <% if (s.title) { %><h2 class="pf-section-title"><%= s.title %></h2><% } %>
+      </div>
+      <% if (s.text) { %>
+      <div class="pf-section-text"><% paragraphs(s.text).forEach(function (t) { %><p><%= t %></p><% }) %></div>
+      <% } %>
+
+      <% s.photos.forEach(function (ph) { %>
+      <figure class="pf-photo">
+        <a href="<%= ph.file.url %>" target="_blank" rel="noopener"><img src="<%= ph.file.url %>" alt="<%= ph.caption || '' %>" loading="lazy" /></a>
+        <% if (ph.caption) { %><figcaption><%= ph.caption %></figcaption><% } %>
+      </figure>
+      <% }) %>
+
+      <% if (s.works.length) { %>
+      <div class="pf-works">
+        <% s.works.forEach(function (w) { %>
+        <figure class="pf-work">
+          <% if (w.avatar) { %><a href="<%= w.avatar.url %>" target="_blank" rel="noopener" class="pf-work-img"><img src="<%= w.avatar.thumb_url || w.avatar.url %>" data-full="<%= w.avatar.url %>" onerror="if (this.dataset.full && this.src !== this.dataset.full) { this.src = this.dataset.full } else { this.onerror = null }" alt="<%= w.name || '' %>" loading="lazy" /></a><% } %>
+          <figcaption>
+            <b>«<%= w.name || 'Без названия' %>»</b><% if (workCaption(w)) { %>. <%= workCaption(w) %><% } %>
+          </figcaption>
+        </figure>
+        <% }) %>
+      </div>
+      <% } %>
+    </section>
+    <% }) %>
+
+    <% if (p.contacts) { %>
+    <section class="pf-contacts">
+      <h2 class="pf-h2">Контакты</h2>
+      <% paragraphs(p.contacts).forEach(function (t) { %><p><%= t %></p><% }) %>
+    </section>
+    <% } %>
+  </main>
+
+  <footer class="pf-footer">© <%= p.title %></footer>
+</body>
+</html>

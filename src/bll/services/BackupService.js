@@ -116,7 +116,7 @@ async function collectData(userIds) {
     }
     for (const t of ['my_art_object', 'my_contact', 'my_collection', 'my_collection_folder', 'my_exhibition',
         'my_file', 'my_file_folder', 'my_link', 'my_note', 'my_report', 'my_task_board', 'my_task_status',
-        'my_biography', 'my_cv', 'my_workspace']) {
+        'my_biography', 'my_cv', 'my_workspace', 'my_portfolio']) {
         d[t] = await own(t);
     }
 
@@ -240,6 +240,7 @@ async function buildXlsx(d, meta) {
         ['Продаж', d.my_sale.length],
         ['Ссылок', d.my_collection.length],
         ['Выставок', d.my_exhibition.length],
+        ['Портфолио', d.my_portfolio.length],
         ['Задач', d.my_task.length],
         ['Заметок', d.my_note.length],
         ['Файлов', d.my_file.length],
@@ -268,8 +269,15 @@ async function buildXlsx(d, meta) {
     })));
 
     const worksPerArtist = group(d.my_art_object, 'artist');
-    addSheet(wb, 'Художники', [['Имя', 'name', 30], ['Работ', 'count', 10], ...ownerCol, ['ID', 'id', 38]],
-        d.my_artist.map(a => ({ name: a.name, count: (worksPerArtist.get(a.id) || []).length, ...owner(a), id: a.id })));
+    addSheet(wb, 'Художники', [
+        ['Имя', 'name', 30], ['Работ', 'count', 10], ['Телефон', 'phone', 18], ['Email', 'email', 24],
+        ['Мессенджер', 'messenger', 18], ['Город', 'city', 14], ['Год рождения', 'birth_year', 10],
+        ['Комиссия, %', 'commission', 10], ['Фото', 'avatar', 24], ['О художнике', 'bio', 40], ...ownerCol, ['ID', 'id', 38],
+    ], d.my_artist.map(a => ({
+        name: a.name, count: (worksPerArtist.get(a.id) || []).length, phone: a.phone, email: a.email,
+        messenger: a.messenger, city: a.city, birth_year: num(a.birth_year), commission: num(a.commission_pct),
+        avatar: fileName(a.avatar_id), bio: a.bio, ...owner(a), id: a.id,
+    })));
 
     addSheet(wb, 'Контакты', [
         ['Имя', 'name', 26], ['Компания', 'company', 22], ['Телефон', 'phone', 18], ['Email', 'email', 24],
@@ -319,12 +327,12 @@ async function buildXlsx(d, meta) {
     })));
 
     addSheet(wb, 'Задачи', [
-        ['Доска', 'board', 22], ['Задача', 'title', 36], ['Статус', 'status', 16], ['Исполнитель', 'assignee', 20],
+        ['Доска', 'board', 22], ['Задача', 'title', 36], ['Статус', 'status', 16], ['Исполнитель', 'assignee', 20], ['Художник', 'artist', 20],
         ['Срок', 'due', 12, 'dd.mm.yyyy'], ['Приоритет', 'priority', 12], ['Описание', 'description', 40],
         ['Выполнена', 'completed', 16, 'dd.mm.yyyy hh:mm'], ['Создана', 'ctime', 16, 'dd.mm.yyyy hh:mm'], ['ID', 'id', 38],
     ], d.my_task.map(t => ({
         board: boards.get(t.board_id)?.name, title: t.title, status: taskStatuses.get(t.status_id)?.name,
-        assignee: personName(users.get(t.assignee_id)), due: t.due_date ? new Date(`${t.due_date}T00:00:00Z`) : '',
+        assignee: personName(users.get(t.assignee_id)), artist: artists.get(t.artist_id)?.name, due: t.due_date ? new Date(`${t.due_date}T00:00:00Z`) : '',
         priority: PRIORITY_LABELS[t.priority] || t.priority, description: htmlToText(t.description), completed: dt(t.completed_at), ctime: dt(t.ctime), id: t.id,
     })));
 

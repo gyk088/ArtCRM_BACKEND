@@ -5,4 +5,5 @@ import PublicPageController from '../../controllers/publicPage.js'
 export default async function publicPageRoutes(fastify, _options) {
     fastify.get('/collection/:id', PublicPageController.collectionLanding)
     fastify.get('/exhibition/:id', PublicPageController.exhibitionLanding)
+    fastify.get('/portfolio/:id', PublicPageController.portfolioLanding)
 }

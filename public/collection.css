@@ -373,6 +373,49 @@ html[data-theme="light"] .hero-bg {
   text-align: left;
 }
 
+/* Маркированный список в шапке (чаще всего — перечень художников):
+   вместо столбика с точками слева — центрированная строка имён с широким
+   интервалом, переносится на несколько строк (без разделителей — иначе при
+   переносе строка начиналась бы с «·»). Нумерованный (ol)
+   оставляем обычным списком. */
+.hero-description ul {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 6px 30px;
+  max-width: 900px;
+  margin: 4px auto 14px;
+  padding: 0;
+  text-align: center;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+}
+
+.hero-description ul li {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.hero-description ul li p {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .hero-description ul {
+    font-size: 15px;
+    gap: 4px 18px;
+  }
+
+  .hero-description ul li {
+    white-space: normal;
+  }
+}
+
 .hero-description blockquote {
   margin: 0 0 12px;
   padding-left: 14px;

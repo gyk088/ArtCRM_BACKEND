@@ -71,6 +71,8 @@ export default class SaleService {
             comment: row.comment,
             artist_paid: !!row.artist_paid,
             artist_paid_at: row.artist_paid_at ?? null,
+            // Комиссия галереи именно для этой продажи (null — берётся из анкеты художника)
+            commission_pct: toNumberOrNull(row.commission_pct),
             ctime: row.ctime,
             utime: row.utime,
         };
@@ -136,6 +138,17 @@ export default class SaleService {
         if (has('artist_paid')) {
             if (typeof data.artist_paid !== 'boolean') throw new Error('artist_paid must be true or false');
             out.artist_paid = data.artist_paid;
+        }
+
+        if (has('commission_pct')) {
+            const raw = data.commission_pct;
+            if (raw === null || raw === '') {
+                out.commission_pct = null;
+            } else {
+                const pct = Number(raw);
+                if (!Number.isFinite(pct) || pct < 0 || pct > 100) throw new Error('commission_pct must be between 0 and 100');
+                out.commission_pct = round2(pct);
+            }
         }
 
         if (has('comment')) {
@@ -306,7 +319,7 @@ export default class SaleService {
             Object.assign(sale.f, SaleService.__resolvePrice(fields, listPrice));
         }
 
-        for (const key of ['sale_date', 'contact_id', 'comment']) {
+        for (const key of ['sale_date', 'contact_id', 'comment', 'commission_pct']) {
             if (fields[key] !== undefined) sale.f[key] = fields[key];
         }
         // расчёт с художником: запоминаем, кто и когда отметил

@@ -9,6 +9,9 @@ import exhibitionRoutes from './routes/v1/exhibition/index.js'
 import contactRoutes from './routes/v1/contact/index.js'
 import adminRoutes from './routes/v1/admin/index.js'
 import publicPageRoutes from './routes/public/index.js'
+import portfolioRoutes from './routes/v1/portfolio/index.js'
+import historyRoutes from './routes/v1/history/index.js'
+import ChangeLogService from './bll/services/ChangeLogService.js'
 import textDocumentRoutes from './routes/v1/textDocument/index.js'
 import saleRoutes from './routes/v1/sale/index.js'
 import reportRoutes from './routes/v1/report/index.js'
@@ -91,7 +94,12 @@ fastify.register(noteRoutes, { prefix: '/api/v1/notes' })
 fastify.register(taskRoutes, { prefix: '/api/v1/tasks' })
 fastify.register(notificationRoutes, { prefix: '/api/v1/notifications' })
 fastify.register(backupRoutes, { prefix: '/api/v1/backup' })
+fastify.register(portfolioRoutes, { prefix: '/api/v1/portfolios' })
+fastify.register(historyRoutes, { prefix: '/api/v1/history' })
 fastify.register(publicPageRoutes)
+
+// История изменений («кто и когда») — см. ChangeLogService
+ChangeLogService.register(fastify)
 
 // Аудит-лог всех мутирующих запросов, сделанных во время имперсонации —
 // покрывает "все действия" из ТЗ без необходимости расставлять логирование

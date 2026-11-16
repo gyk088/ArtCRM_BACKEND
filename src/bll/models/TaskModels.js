@@ -71,6 +71,8 @@ export class TaskModel extends PgObject {
       description: {},
       status_id: { required: true },
       assignee_id: {},
+      // художник, к которому относится задача (раздел «Мои художники», step 46)
+      artist_id: {},
       due_date: {},
       priority: { default: 'normal' },
       order_num: {},

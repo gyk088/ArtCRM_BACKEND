@@ -60,6 +60,10 @@ export default async function artRoutes(fastify, _options) {
     fastify.post('/artists', {preHandler: [auth()]}, ArtController.createArtist);
     fastify.get('/artists', {preHandler: [auth()]}, ArtController.getAllArtists);
     fastify.get('/artists/user/:userId', {preHandler: [auth()]}, ArtController.getArtistByUserId);
+    // «Мои художники»: список со сводкой и лимитом, карточка художника
+    fastify.get('/artists/summary', {preHandler: [auth()]}, ArtController.getArtistsSummary);
+    fastify.get('/artists/byline-options', {preHandler: [auth()]}, ArtController.getBylineOptions);
+    fastify.get('/artists/:id/overview', {preHandler: [auth()]}, ArtController.getArtistOverview);
     fastify.get('/artists/:id', {preHandler: [auth()]}, ArtController.getArtistById);
     fastify.put('/artists', {preHandler: [auth()]}, ArtController.updateArtist);
     fastify.delete('/artists/:id', {preHandler: [auth()]}, ArtController.deleteArtist);

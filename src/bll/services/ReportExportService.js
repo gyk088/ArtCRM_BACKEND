@@ -94,6 +94,12 @@ export default class ReportExportService {
                 row.getCell('commission_pct').font = { bold: true, color: { argb: 'FF8A6D2F' } };
                 row.getCell('commission_pct').note = 'Индивидуальная комиссия для этой продажи';
             }
+            if (r.commission_source === 'artist') {
+                row.getCell('commission_pct').note = 'Комиссия художника по умолчанию (раздел «Мои художники»)';
+            }
+            if (r.commission_source === 'sale') {
+                row.getCell('commission_pct').note = 'Комиссия, заданная для этой продажи (раздел «Мои художники» → Продажи)';
+            }
             // Нет курса — подсвечиваем, чтобы было видно, почему строка не в итоге
             if (r.rate === null) {
                 row.getCell('rate').value = 'нет курса';

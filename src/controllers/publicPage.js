@@ -1,5 +1,6 @@
 import CollectionService from '../bll/services/CollectionService.js';
 import ExhibitionService from '../bll/services/ExhibitionService.js';
+import PortfolioService from '../bll/services/PortfolioService.js';
 import { icons } from '../bll/utils/svgIcons.js';
 
 function stripHtml(html) {
@@ -100,6 +101,31 @@ function formatDateRange(startDate, endDate) {
     }
 
     return `${formatDate(start)} – ${formatDate(end)}`;
+}
+
+// === Портфолио ===
+// Абзацы из обычного текста (пустая строка или перенос — новый абзац)
+function paragraphs(text) {
+    return String(text || '').split(/\n+/).map(t => t.trim()).filter(Boolean);
+}
+
+// Строка выставки «2020 "Название", место» → { year, text }
+function exhibitionLines(text) {
+    const lines = [];
+    for (const raw of String(text || '').split('\n')) {
+        const line = raw.trim();
+        if (!line) continue;
+        const m = line.match(/^(\d{4}(?:\s*[–—-]\s*\d{2,4})?)[\s.,:—–-]+(.+)$/);
+        // строка без года — продолжение предыдущей (перенос длинного названия)
+        if (!m && lines.length) lines[lines.length - 1].text += ` ${line}`;
+        else lines.push(m ? { year: m[1], text: m[2] } : { year: '', text: line });
+    }
+    return lines;
+}
+
+// Подпись работы: «Название». 2020. Холст, масло. 100×80 см
+function workCaption(w) {
+    return [w.year, w.technique, w.size].filter(Boolean).join('. ');
 }
 
 export default class PublicPageController {
@@ -210,6 +236,30 @@ export default class PublicPageController {
                 isFieldVisible: (key) => isFieldVisible(exhibition.visibleFields, key),
                 formatPrice: (price, workCurrency) => formatPrice(price, workCurrency, exhibition),
                 statusPillStyle,
+            });
+        } catch (error) {
+            request.log.error(error);
+            reply.code(500).send('Internal Server Error');
+        }
+    }
+
+    static async portfolioLanding(request, reply) {
+        try {
+            const portfolio = await PortfolioService.getPublic(request.params.id).catch(() => null);
+            if (!portfolio) {
+                return reply.code(404).view('portfolio-not-found.ejs');
+            }
+            const pageUrl = `${request.protocol}://${request.headers.host}${request.url}`;
+            const ogDescription = [portfolio.subtitle, paragraphs(portfolio.bio)[0]].filter(Boolean).join(' · ').slice(0, 160);
+            return reply.view('portfolio.ejs', {
+                p: portfolio,
+                pageUrl,
+                ogDescription,
+                ogImage: portfolio.cover?.url || portfolio.bio_photo?.url || '',
+                paragraphs,
+                solo: exhibitionLines(portfolio.exhibitions_solo),
+                group: exhibitionLines(portfolio.exhibitions_group),
+                workCaption,
             });
         } catch (error) {
             request.log.error(error);

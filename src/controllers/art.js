@@ -1,4 +1,5 @@
 import ArtService from '../bll/services/ArtService.js';
+import ArtistService from '../bll/services/ArtistService.js';
 
 export default class ArtController {
     // ============= ART OBJECT CONTROLLERS =============
@@ -382,6 +383,30 @@ export default class ArtController {
             return artist;
         } catch (error) {
             reply.code(400).send({ error: error.message });
+        }
+    }
+
+    static async getArtistsSummary(request, reply) {
+        try {
+            return await ArtistService.summary(request.user);
+        } catch (error) {
+            reply.code(400).send({ error: error.message });
+        }
+    }
+
+    static async getBylineOptions(request, reply) {
+        try {
+            return await ArtistService.bylineOptions(request.user);
+        } catch (error) {
+            reply.code(400).send({ error: error.message });
+        }
+    }
+
+    static async getArtistOverview(request, reply) {
+        try {
+            return await ArtistService.overview(request.params.id, request.user);
+        } catch (error) {
+            reply.code(error.message === 'Artist not found' ? 404 : 400).send({ error: error.message });
         }
     }
 
